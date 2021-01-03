@@ -22,4 +22,10 @@ Either way, you'll need to set up your deployment server to start:
 
   1.  `heroku git:remote your-app-name` You'll need to be a collaborator on the app.
 
-### When you're ready to d
+### When you're ready to deploy
+
+#### Option A: Automatic Deployment via Continuous Integration
+
+(_**NOTE**: This step assumes that you already have Travis-CI testing your code._)
+
+CI is not about testing
