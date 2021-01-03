@@ -16,4 +16,10 @@ Either way, you'll need to set up your deployment server to start:
 * **If you're creating a new app...**
 
   1.  `heroku create` or `heroku create your-app-name` if you have a name in mind.
-  2.  `heroku addons:create heroku-postgresql:hobby-dev` to add ("provision") a 
+  2.  `heroku addons:create heroku-postgresql:hobby-dev` to add ("provision") a postgres database to your heroku dyno
+
+* **If you already have a Heroku app...**
+
+  1.  `heroku git:remote your-app-name` You'll need to be a collaborator on the app.
+
+### When you're ready to d
