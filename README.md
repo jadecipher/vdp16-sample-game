@@ -28,4 +28,6 @@ Either way, you'll need to set up your deployment server to start:
 
 (_**NOTE**: This step assumes that you already have Travis-CI testing your code._)
 
-CI is not about testing per se – it's about _continuously integrating_ your changes into the live application, instead of periodically _releasing_ new versions. CI tools can not only test your code, but then automatically depl
+CI is not about testing per se – it's about _continuously integrating_ your changes into the live application, instead of periodically _releasing_ new versions. CI tools can not only test your code, but then automatically deploy your app. Boilermaker comes with a `.travis.yml` configuration almost ready for deployment; follow these steps to complete the job.
+
+1.  Run `git checkout master && git pull && git checkout -b f/trav
