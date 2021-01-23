@@ -30,4 +30,6 @@ Either way, you'll need to set up your deployment server to start:
 
 CI is not about testing per se – it's about _continuously integrating_ your changes into the live application, instead of periodically _releasing_ new versions. CI tools can not only test your code, but then automatically deploy your app. Boilermaker comes with a `.travis.yml` configuration almost ready for deployment; follow these steps to complete the job.
 
-1.  Run `git checkout master && git pull && git checkout -b f/trav
+1.  Run `git checkout master && git pull && git checkout -b f/travis-deploy` (or use some other new branch name).
+2.  Un-comment the bottom part of `.travis.yml` (the `before_deploy` and `deploy` sections)
+3.  Add your Heroku app name to `deploy.app`, where it says "YOUR HEROK
