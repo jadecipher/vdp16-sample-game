@@ -32,4 +32,5 @@ CI is not about testing per se – it's about _continuously integrating_ your ch
 
 1.  Run `git checkout master && git pull && git checkout -b f/travis-deploy` (or use some other new branch name).
 2.  Un-comment the bottom part of `.travis.yml` (the `before_deploy` and `deploy` sections)
-3.  Add your Heroku app name to `deploy.app`, where it says "YOUR HEROK
+3.  Add your Heroku app name to `deploy.app`, where it says "YOUR HEROKU APP NAME HERE". For example, if your domain is `cool-salty-conifer.herokuapp.com`, your app name is `cool-salty-conifer`.
+4.  Install the Travis CLI tools by following [the instr
