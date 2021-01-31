@@ -37,4 +37,10 @@ CI is not about testing per se – it's about _continuously integrating_ your ch
 5.  Run `travis encrypt $(heroku auth:token) --org` to encrypt your Heroku API key. _**Warning:** do not run the `--add` command suggested by Travis, that will rewrite part of our existing config!_
 6.  Copy-paste your encrypted API key into the `.travis.yml` file under `deploy.api_key.secure`, where it says "YOUR ENCRYPTED API KEY HERE".
 7.  `git add -A && git commit -m 'travis: activate deployment' && git push -u origin f/travis-deploy`
-8.  Make a PR for the new branch, get it approved, and merge it into ma
+8.  Make a PR for the new branch, get it approved, and merge it into master.
+
+That's it! From now on, whenever `master` is updated on GitHub, Travis will automatically push the app to Heroku for you.
+
+#### Option B: Manual Deployment from your Local Machine
+
+Some devel
