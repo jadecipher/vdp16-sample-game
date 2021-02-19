@@ -46,4 +46,5 @@ That's it! From now on, whenever `master` is updated on GitHub, Travis will auto
 Some developers may prefer to control deployment rather than rely on automation. Your local copy of the application can be pushed up to Heroku at will, using Boilermaker's handy deployment script:
 
 1.  Make sure that all your work is fully committed and pushed to your master branch on Github.
-2.  If you currently have an existing branch called "dep
+2.  If you currently have an existing branch called "deploy", delete it now (`git branch -d deploy`). We're going to use a dummy branch with the name "deploy" (see below), so if you have one lying around, the script below will error
+3.  `npm run d
