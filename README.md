@@ -43,4 +43,7 @@ That's it! From now on, whenever `master` is updated on GitHub, Travis will auto
 
 #### Option B: Manual Deployment from your Local Machine
 
-Some developers may prefer to control deployment rather than rely on automation. Your local copy of the application can be pushed up to Heroku at will, using Boilermaker's ha
+Some developers may prefer to control deployment rather than rely on automation. Your local copy of the application can be pushed up to Heroku at will, using Boilermaker's handy deployment script:
+
+1.  Make sure that all your work is fully committed and pushed to your master branch on Github.
+2.  If you currently have an existing branch called "dep
