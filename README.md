@@ -51,4 +51,6 @@ Some developers may prefer to control deployment rather than rely on automation.
 
 * `git checkout -b deploy`: checks out a new branch called "deploy". Note that the name "deploy" here isn't magical, but it needs to match the name of the branch we specify when we push to our heroku remote.
 * `webpack -p`: webpack will run in "production mode"
-* `git add -f public/bundle.js public/bundle.js.map`: "force" add the ot
+* `git add -f public/bundle.js public/bundle.js.map`: "force" add the otherwise gitignored build files
+* `git commit --allow-empty -m 'Deploying'`: create a commit, even if nothing changed
+* `git push --force heroku deploy:master`: push your local "d
