@@ -53,4 +53,10 @@ Some developers may prefer to control deployment rather than rely on automation.
 * `webpack -p`: webpack will run in "production mode"
 * `git add -f public/bundle.js public/bundle.js.map`: "force" add the otherwise gitignored build files
 * `git commit --allow-empty -m 'Deploying'`: create a commit, even if nothing changed
-* `git push --force heroku deploy:master`: push your local "d
+* `git push --force heroku deploy:master`: push your local "deploy" branch to the "master" branch on heroku
+* `git checkout master`: return to your master branch
+* `git branch -D deploy`: remove the deploy branch
+
+Now, you should be deployed!
+
+Why do all of these steps? The big reason is because we don't want our production server to be cluttered up with dev dependencies like webpack, but at 
