@@ -7,4 +7,11 @@ const App = () => {
   return (
     <div>
       <Navbar />
-      <
+      <div id="container">
+        <Routes />
+      </div>
+    </div>
+  );
+};
+
+export default App;
