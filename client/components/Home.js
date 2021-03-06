@@ -9,4 +9,11 @@ export const Home = () => {
       <div id="bullets">
         <h4>Saint Michael's College Alumn</h4>
         <h4>Former Calculus Teacher</h4>
-        <h4>Grace Hopper Program at Fullstack Academy of Code Alum
+        <h4>Grace Hopper Program at Fullstack Academy of Code Alumn</h4>
+        <h4>
+          Currently a Teaching Fellow at{' '}
+          <a
+            href="https://www.gracehopper.com/"
+            target="_blank"
+            without
+            
