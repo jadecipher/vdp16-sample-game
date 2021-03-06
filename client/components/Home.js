@@ -16,4 +16,15 @@ export const Home = () => {
             href="https://www.gracehopper.com/"
             target="_blank"
             without
-            
+            rel="noopener noreferrer"
+          >
+            The Grace Hopper Program
+          </a>{' '}
+          at Fullstack Academy of Code
+        </h4>
+      </div>
+    </div>
+  );
+};
+
+export default H
