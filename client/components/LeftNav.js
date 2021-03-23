@@ -31,4 +31,11 @@ const LeftNav = () => (
       href="mailto:michaelaburns0@gmail.com?Subject=Hi%20Michaela!"
       target="_blank"
       without
-      r
+      rel="noopener noreferrer"
+    >
+      <img
+        className="logo"
+        src="https://upload.wikimedia.org/wikipedia/commons/4/4e/Gmail_Icon.png"
+        alt="email icon"
+      />
+    
