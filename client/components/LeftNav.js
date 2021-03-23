@@ -16,4 +16,11 @@ const LeftNav = () => (
     </a>
     <a
       color="inherit"
-     
+      href="https://github.com/michslush"
+      target="_blank"
+      without
+      rel="noopener noreferrer"
+    >
+      <img
+        className="logo"
+        src="https://c
