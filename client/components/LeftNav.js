@@ -38,4 +38,8 @@ const LeftNav = () => (
         src="https://upload.wikimedia.org/wikipedia/commons/4/4e/Gmail_Icon.png"
         alt="email icon"
       />
-    
+    </a>
+  </div>
+);
+
+export default LeftNav;
