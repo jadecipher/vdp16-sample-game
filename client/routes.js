@@ -16,4 +16,14 @@ import {
 
 class Routes extends Component {
   componentDidMount() {
-    this.props.l
+    this.props.loadInitialData();
+  }
+
+  render() {
+    const {isLoggedIn} = this.props;
+
+    return (
+      <div id="routes-div">
+        <Switch>
+          <Route path="/login" component={Login} />
+          <Route path="/signu
