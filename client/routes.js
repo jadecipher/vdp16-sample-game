@@ -31,4 +31,9 @@ class Routes extends Component {
             <Switch>
               <Route exact path="/user-home" component={UserHome} />
               <Route
-            
+                exact
+                path="/home"
+                render={() => <Redirect to="/user-home" />}
+              />
+              <Route exact path="/home" component={Home} />
+              
