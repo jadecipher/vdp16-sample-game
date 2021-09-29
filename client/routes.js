@@ -38,4 +38,9 @@ class Routes extends Component {
               <Route exact path="/home" component={Home} />
               <Route exact path="/about" component={About} />
               <Route exact path="/projects" component={Projects} />
-              <Route exact path="/admin" compo
+              <Route exact path="/admin" component={AdminForm} />
+            </Switch>
+          )}
+          <Route exact path="/" render={() => <Redirect to="/home" />} />
+          <Route exact path="/home" component={Home} />
+          <R
