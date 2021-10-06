@@ -43,4 +43,13 @@ class Routes extends Component {
           )}
           <Route exact path="/" render={() => <Redirect to="/home" />} />
           <Route exact path="/home" component={Home} />
-          <R
+          <Route exact path="/about" component={About} />
+          <Route exact path="/projects" component={Projects} />
+        </Switch>
+        <LeftNav />
+      </div>
+    );
+  }
+}
+
+const mapState 
