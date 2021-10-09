@@ -52,4 +52,18 @@ class Routes extends Component {
   }
 }
 
-const mapState 
+const mapState = state => {
+  return {
+    isLoggedIn: !!state.user.id
+  };
+};
+
+const mapDispatch = dispatch => {
+  return {
+    loadInitialData() {
+      dispatch(me());
+    }
+  };
+};
+
+// The `withRouter` w
