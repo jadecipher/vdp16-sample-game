@@ -66,4 +66,9 @@ const mapDispatch = dispatch => {
   };
 };
 
-// The `withRouter` w
+// The `withRouter` wrapper makes sure that updates are not blocked
+// when the url changes
+export default withRouter(connect(mapState, mapDispatch)(Routes));
+
+Routes.propTypes = {
+  loadInitialData: Pr
