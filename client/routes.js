@@ -71,4 +71,6 @@ const mapDispatch = dispatch => {
 export default withRouter(connect(mapState, mapDispatch)(Routes));
 
 Routes.propTypes = {
-  loadInitialData: Pr
+  loadInitialData: PropTypes.func.isRequired,
+  isLoggedIn: PropTypes.bool.isRequired
+};
