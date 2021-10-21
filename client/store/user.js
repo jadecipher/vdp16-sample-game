@@ -52,4 +52,16 @@ export const logout = () => async dispatch => {
     dispatch(removeUser())
     history.push('/login')
   } catch (err) {
-    console.error(er
+    console.error(err)
+  }
+}
+
+/**
+ * REDUCER
+ */
+export default function(state = defaultUser, action) {
+  switch (action.type) {
+    case GET_USER:
+      return action.user
+    case REMOVE_USER:
+      r
