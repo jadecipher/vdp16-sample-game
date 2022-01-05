@@ -965,3 +965,176 @@ var auth = function auth(email, password, method) {
                 res = _context2.sent;
                 _context2.next = 9;
                 break;
+
+              case 6:
+                _context2.prev = 6;
+                _context2.t0 = _context2["catch"](0);
+                return _context2.abrupt("return", dispatch(getUser({
+                  error: _context2.t0
+                })));
+
+              case 9:
+                try {
+                  dispatch(getUser(res.data));
+                  _history__WEBPACK_IMPORTED_MODULE_1__["default"].push('/home');
+                } catch (dispatchOrHistoryErr) {
+                  console.error(dispatchOrHistoryErr);
+                }
+
+              case 10:
+              case "end":
+                return _context2.stop();
+            }
+          }
+        }, _callee2, null, [[0, 6]]);
+      }));
+
+      return function (_x2) {
+        return _ref2.apply(this, arguments);
+      };
+    }()
+  );
+};
+var logout = function logout() {
+  return (
+    /*#__PURE__*/
+    function () {
+      var _ref3 = _asyncToGenerator(
+      /*#__PURE__*/
+      regeneratorRuntime.mark(function _callee3(dispatch) {
+        return regeneratorRuntime.wrap(function _callee3$(_context3) {
+          while (1) {
+            switch (_context3.prev = _context3.next) {
+              case 0:
+                _context3.prev = 0;
+                _context3.next = 3;
+                return axios__WEBPACK_IMPORTED_MODULE_0___default.a.post('/auth/logout');
+
+              case 3:
+                dispatch(removeUser());
+                _history__WEBPACK_IMPORTED_MODULE_1__["default"].push('/login');
+                _context3.next = 10;
+                break;
+
+              case 7:
+                _context3.prev = 7;
+                _context3.t0 = _context3["catch"](0);
+                console.error(_context3.t0);
+
+              case 10:
+              case "end":
+                return _context3.stop();
+            }
+          }
+        }, _callee3, null, [[0, 7]]);
+      }));
+
+      return function (_x3) {
+        return _ref3.apply(this, arguments);
+      };
+    }()
+  );
+};
+/**
+ * REDUCER
+ */
+
+/* harmony default export */ __webpack_exports__["default"] = (function () {
+  var state = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : defaultUser;
+  var action = arguments.length > 1 ? arguments[1] : undefined;
+
+  switch (action.type) {
+    case GET_USER:
+      return action.user;
+
+    case REMOVE_USER:
+      return defaultUser;
+
+    default:
+      return state;
+  }
+});
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/lib/index.js":
+/*!***************************************************!*\
+  !*** ./node_modules/@babel/polyfill/lib/index.js ***!
+  \***************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+__webpack_require__(/*! ./noConflict */ "./node_modules/@babel/polyfill/lib/noConflict.js");
+
+function _global() {
+  const data = _interopRequireDefault(__webpack_require__(/*! core-js/library/fn/global */ "./node_modules/@babel/polyfill/node_modules/core-js/library/fn/global.js"));
+
+  _global = function () {
+    return data;
+  };
+
+  return data;
+}
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+if (_global().default._babelPolyfill && typeof console !== "undefined" && console.warn) {
+  console.warn("@babel/polyfill is loaded more than once on this page. This is probably not desirable/intended " + "and may have consequences if different versions of the polyfills are applied sequentially. " + "If you do need to load the polyfill more than once, use @babel/polyfill/noConflict " + "instead to bypass the warning.");
+}
+
+_global().default._babelPolyfill = true;
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/lib/noConflict.js":
+/*!********************************************************!*\
+  !*** ./node_modules/@babel/polyfill/lib/noConflict.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+__webpack_require__(/*! core-js/es6 */ "./node_modules/@babel/polyfill/node_modules/core-js/es6/index.js");
+
+__webpack_require__(/*! core-js/fn/array/includes */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/array/includes.js");
+
+__webpack_require__(/*! core-js/fn/array/flat-map */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/array/flat-map.js");
+
+__webpack_require__(/*! core-js/fn/string/pad-start */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/string/pad-start.js");
+
+__webpack_require__(/*! core-js/fn/string/pad-end */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/string/pad-end.js");
+
+__webpack_require__(/*! core-js/fn/string/trim-start */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/string/trim-start.js");
+
+__webpack_require__(/*! core-js/fn/string/trim-end */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/string/trim-end.js");
+
+__webpack_require__(/*! core-js/fn/symbol/async-iterator */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/symbol/async-iterator.js");
+
+__webpack_require__(/*! core-js/fn/object/get-own-property-descriptors */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/object/get-own-property-descriptors.js");
+
+__webpack_require__(/*! core-js/fn/object/values */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/object/values.js");
+
+__webpack_require__(/*! core-js/fn/object/entries */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/object/entries.js");
+
+__webpack_require__(/*! core-js/fn/promise/finally */ "./node_modules/@babel/polyfill/node_modules/core-js/fn/promise/finally.js");
+
+__webpack_require__(/*! core-js/web */ "./node_modules/@babel/polyfill/node_modules/core-js/web/index.js");
+
+__webpack_require__(/*! regenerator-runtime/runtime */ "./node_modules/regenerator-runtime/runtime.js");
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/es6/index.js":
+/*!************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/es6/index.js ***!
+  \************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+__webpack_require__(/*! ../modules/es6.symbol */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.symbol.js");
+__webpack_require__(/*! ../modules/es6.object.create */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.object.create.js");
