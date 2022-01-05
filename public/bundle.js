@@ -766,3 +766,202 @@ function (_Component) {
 }(react__WEBPACK_IMPORTED_MODULE_0__["Component"]);
 
 var mapState = function mapState(state) {
+  return {
+    isLoggedIn: !!state.user.id
+  };
+};
+
+var mapDispatch = function mapDispatch(dispatch) {
+  return {
+    loadInitialData: function loadInitialData() {
+      dispatch(Object(_store__WEBPACK_IMPORTED_MODULE_2__["me"])());
+    }
+  };
+}; // The `withRouter` wrapper makes sure that updates are not blocked
+// when the url changes
+
+
+/* harmony default export */ __webpack_exports__["default"] = (Object(react_router_dom__WEBPACK_IMPORTED_MODULE_3__["withRouter"])(Object(react_redux__WEBPACK_IMPORTED_MODULE_1__["connect"])(mapState, mapDispatch)(Routes)));
+Routes.propTypes = {
+  loadInitialData: prop_types__WEBPACK_IMPORTED_MODULE_4___default.a.func.isRequired,
+  isLoggedIn: prop_types__WEBPACK_IMPORTED_MODULE_4___default.a.bool.isRequired
+};
+
+/***/ }),
+
+/***/ "./client/socket.js":
+/*!**************************!*\
+  !*** ./client/socket.js ***!
+  \**************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var socket_io_client__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! socket.io-client */ "./node_modules/socket.io-client/lib/index.js");
+/* harmony import */ var socket_io_client__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(socket_io_client__WEBPACK_IMPORTED_MODULE_0__);
+
+var socket = socket_io_client__WEBPACK_IMPORTED_MODULE_0___default()(window.location.origin);
+socket.on('connect', function () {
+  console.log('Connected!');
+});
+/* harmony default export */ __webpack_exports__["default"] = (socket);
+
+/***/ }),
+
+/***/ "./client/store/index.js":
+/*!*******************************!*\
+  !*** ./client/store/index.js ***!
+  \*******************************/
+/*! exports provided: default, me, auth, logout */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var redux__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! redux */ "./node_modules/redux/es/redux.js");
+/* harmony import */ var redux_logger__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! redux-logger */ "./node_modules/redux-logger/dist/redux-logger.js");
+/* harmony import */ var redux_logger__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(redux_logger__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var redux_thunk__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! redux-thunk */ "./node_modules/redux-thunk/es/index.js");
+/* harmony import */ var redux_devtools_extension__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! redux-devtools-extension */ "./node_modules/redux-devtools-extension/index.js");
+/* harmony import */ var redux_devtools_extension__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(redux_devtools_extension__WEBPACK_IMPORTED_MODULE_3__);
+/* harmony import */ var _user__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./user */ "./client/store/user.js");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "me", function() { return _user__WEBPACK_IMPORTED_MODULE_4__["me"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "auth", function() { return _user__WEBPACK_IMPORTED_MODULE_4__["auth"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "logout", function() { return _user__WEBPACK_IMPORTED_MODULE_4__["logout"]; });
+
+
+
+
+
+
+var reducer = Object(redux__WEBPACK_IMPORTED_MODULE_0__["combineReducers"])({
+  user: _user__WEBPACK_IMPORTED_MODULE_4__["default"]
+});
+var middleware = Object(redux_devtools_extension__WEBPACK_IMPORTED_MODULE_3__["composeWithDevTools"])(Object(redux__WEBPACK_IMPORTED_MODULE_0__["applyMiddleware"])(redux_thunk__WEBPACK_IMPORTED_MODULE_2__["default"], Object(redux_logger__WEBPACK_IMPORTED_MODULE_1__["createLogger"])({
+  collapsed: true
+})));
+var store = Object(redux__WEBPACK_IMPORTED_MODULE_0__["createStore"])(reducer, middleware);
+/* harmony default export */ __webpack_exports__["default"] = (store);
+
+
+/***/ }),
+
+/***/ "./client/store/user.js":
+/*!******************************!*\
+  !*** ./client/store/user.js ***!
+  \******************************/
+/*! exports provided: me, auth, logout, default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "me", function() { return me; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "auth", function() { return auth; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "logout", function() { return logout; });
+/* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! axios */ "./node_modules/axios/index.js");
+/* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(axios__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _history__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../history */ "./client/history.js");
+function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { Promise.resolve(value).then(_next, _throw); } }
+
+function _asyncToGenerator(fn) { return function () { var self = this, args = arguments; return new Promise(function (resolve, reject) { var gen = fn.apply(self, args); function _next(value) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "next", value); } function _throw(err) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "throw", err); } _next(undefined); }); }; }
+
+
+
+/**
+ * ACTION TYPES
+ */
+
+var GET_USER = 'GET_USER';
+var REMOVE_USER = 'REMOVE_USER';
+/**
+ * INITIAL STATE
+ */
+
+var defaultUser = {};
+/**
+ * ACTION CREATORS
+ */
+
+var getUser = function getUser(user) {
+  return {
+    type: GET_USER,
+    user: user
+  };
+};
+
+var removeUser = function removeUser() {
+  return {
+    type: REMOVE_USER
+  };
+};
+/**
+ * THUNK CREATORS
+ */
+
+
+var me = function me() {
+  return (
+    /*#__PURE__*/
+    function () {
+      var _ref = _asyncToGenerator(
+      /*#__PURE__*/
+      regeneratorRuntime.mark(function _callee(dispatch) {
+        var res;
+        return regeneratorRuntime.wrap(function _callee$(_context) {
+          while (1) {
+            switch (_context.prev = _context.next) {
+              case 0:
+                _context.prev = 0;
+                _context.next = 3;
+                return axios__WEBPACK_IMPORTED_MODULE_0___default.a.get('/auth/me');
+
+              case 3:
+                res = _context.sent;
+                dispatch(getUser(res.data || defaultUser));
+                _context.next = 10;
+                break;
+
+              case 7:
+                _context.prev = 7;
+                _context.t0 = _context["catch"](0);
+                console.error(_context.t0);
+
+              case 10:
+              case "end":
+                return _context.stop();
+            }
+          }
+        }, _callee, null, [[0, 7]]);
+      }));
+
+      return function (_x) {
+        return _ref.apply(this, arguments);
+      };
+    }()
+  );
+};
+var auth = function auth(email, password, method) {
+  return (
+    /*#__PURE__*/
+    function () {
+      var _ref2 = _asyncToGenerator(
+      /*#__PURE__*/
+      regeneratorRuntime.mark(function _callee2(dispatch) {
+        var res;
+        return regeneratorRuntime.wrap(function _callee2$(_context2) {
+          while (1) {
+            switch (_context2.prev = _context2.next) {
+              case 0:
+                _context2.prev = 0;
+                _context2.next = 3;
+                return axios__WEBPACK_IMPORTED_MODULE_0___default.a.post("/auth/".concat(method), {
+                  email: email,
+                  password: password
+                });
+
+              case 3:
+                res = _context2.sent;
+                _context2.next = 9;
+                break;
