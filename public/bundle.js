@@ -4689,3 +4689,178 @@ var createHTML = function (string, tag, attribute, value) {
   if (attribute !== '') p1 += ' ' + attribute + '="' + String(value).replace(quot, '&quot;') + '"';
   return p1 + '>' + S + '</' + tag + '>';
 };
+module.exports = function (NAME, exec) {
+  var O = {};
+  O[NAME] = exec(createHTML);
+  $export($export.P + $export.F * fails(function () {
+    var test = ''[NAME]('"');
+    return test !== test.toLowerCase() || test.split('"').length > 3;
+  }), 'String', O);
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-pad.js":
+/*!**********************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-pad.js ***!
+  \**********************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// https://github.com/tc39/proposal-string-pad-start-end
+var toLength = __webpack_require__(/*! ./_to-length */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_to-length.js");
+var repeat = __webpack_require__(/*! ./_string-repeat */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-repeat.js");
+var defined = __webpack_require__(/*! ./_defined */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_defined.js");
+
+module.exports = function (that, maxLength, fillString, left) {
+  var S = String(defined(that));
+  var stringLength = S.length;
+  var fillStr = fillString === undefined ? ' ' : String(fillString);
+  var intMaxLength = toLength(maxLength);
+  if (intMaxLength <= stringLength || fillStr == '') return S;
+  var fillLen = intMaxLength - stringLength;
+  var stringFiller = repeat.call(fillStr, Math.ceil(fillLen / fillStr.length));
+  if (stringFiller.length > fillLen) stringFiller = stringFiller.slice(0, fillLen);
+  return left ? stringFiller + S : S + stringFiller;
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-repeat.js":
+/*!*************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-repeat.js ***!
+  \*************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var toInteger = __webpack_require__(/*! ./_to-integer */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_to-integer.js");
+var defined = __webpack_require__(/*! ./_defined */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_defined.js");
+
+module.exports = function repeat(count) {
+  var str = String(defined(this));
+  var res = '';
+  var n = toInteger(count);
+  if (n < 0 || n == Infinity) throw RangeError("Count can't be negative");
+  for (;n > 0; (n >>>= 1) && (str += str)) if (n & 1) res += str;
+  return res;
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-trim.js":
+/*!***********************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-trim.js ***!
+  \***********************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+var defined = __webpack_require__(/*! ./_defined */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_defined.js");
+var fails = __webpack_require__(/*! ./_fails */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_fails.js");
+var spaces = __webpack_require__(/*! ./_string-ws */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-ws.js");
+var space = '[' + spaces + ']';
+var non = '\u200b\u0085';
+var ltrim = RegExp('^' + space + space + '*');
+var rtrim = RegExp(space + space + '*$');
+
+var exporter = function (KEY, exec, ALIAS) {
+  var exp = {};
+  var FORCE = fails(function () {
+    return !!spaces[KEY]() || non[KEY]() != non;
+  });
+  var fn = exp[KEY] = FORCE ? exec(trim) : spaces[KEY];
+  if (ALIAS) exp[ALIAS] = fn;
+  $export($export.P + $export.F * FORCE, 'String', exp);
+};
+
+// 1 -> String#trimLeft
+// 2 -> String#trimRight
+// 3 -> String#trim
+var trim = exporter.trim = function (string, TYPE) {
+  string = String(defined(string));
+  if (TYPE & 1) string = string.replace(ltrim, '');
+  if (TYPE & 2) string = string.replace(rtrim, '');
+  return string;
+};
+
+module.exports = exporter;
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-ws.js":
+/*!*********************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-ws.js ***!
+  \*********************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = '\x09\x0A\x0B\x0C\x0D\x20\xA0\u1680\u180E\u2000\u2001\u2002\u2003' +
+  '\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000\u2028\u2029\uFEFF';
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_task.js":
+/*!****************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/_task.js ***!
+  \****************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var ctx = __webpack_require__(/*! ./_ctx */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_ctx.js");
+var invoke = __webpack_require__(/*! ./_invoke */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_invoke.js");
+var html = __webpack_require__(/*! ./_html */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_html.js");
+var cel = __webpack_require__(/*! ./_dom-create */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_dom-create.js");
+var global = __webpack_require__(/*! ./_global */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_global.js");
+var process = global.process;
+var setTask = global.setImmediate;
+var clearTask = global.clearImmediate;
+var MessageChannel = global.MessageChannel;
+var Dispatch = global.Dispatch;
+var counter = 0;
+var queue = {};
+var ONREADYSTATECHANGE = 'onreadystatechange';
+var defer, channel, port;
+var run = function () {
+  var id = +this;
+  // eslint-disable-next-line no-prototype-builtins
+  if (queue.hasOwnProperty(id)) {
+    var fn = queue[id];
+    delete queue[id];
+    fn();
+  }
+};
+var listener = function (event) {
+  run.call(event.data);
+};
+// Node.js 0.9+ & IE10+ has setImmediate, otherwise:
+if (!setTask || !clearTask) {
+  setTask = function setImmediate(fn) {
+    var args = [];
+    var i = 1;
+    while (arguments.length > i) args.push(arguments[i++]);
+    queue[++counter] = function () {
+      // eslint-disable-next-line no-new-func
+      invoke(typeof fn == 'function' ? fn : Function(fn), args);
+    };
+    defer(counter);
+    return counter;
+  };
+  clearTask = function clearImmediate(id) {
+    delete queue[id];
+  };
+  // Node.js 0.8-
+  if (__webpack_require__(/*! ./_cof */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_cof.js")(process) == 'process') {
+    defer = function (id) {
+      process.nextTick(ctx(run, id, 1));
+    };
+  // Sphere (JS game engine) Dispatch API
+  } else if (Dispatch && Dispatch.now) {
+    defer = function (id) {
+      Dispatch.now(ctx(run, id, 1));
