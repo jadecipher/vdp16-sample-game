@@ -5409,3 +5409,183 @@ if (__webpack_require__(/*! ./_descriptors */ "./node_modules/@babel/polyfill/no
           var $len = data.byteLength;
           if ($length === undefined) {
             if ($len % BYTES) throw RangeError(WRONG_LENGTH);
+            byteLength = $len - offset;
+            if (byteLength < 0) throw RangeError(WRONG_LENGTH);
+          } else {
+            byteLength = toLength($length) * BYTES;
+            if (byteLength + offset > $len) throw RangeError(WRONG_LENGTH);
+          }
+          length = byteLength / BYTES;
+        } else if (TYPED_ARRAY in data) {
+          return fromList(TypedArray, data);
+        } else {
+          return $from.call(TypedArray, data);
+        }
+        hide(that, '_d', {
+          b: buffer,
+          o: offset,
+          l: byteLength,
+          e: length,
+          v: new $DataView(buffer)
+        });
+        while (index < length) addElement(that, index++);
+      });
+      TypedArrayPrototype = TypedArray[PROTOTYPE] = create($TypedArrayPrototype$);
+      hide(TypedArrayPrototype, 'constructor', TypedArray);
+    } else if (!fails(function () {
+      TypedArray(1);
+    }) || !fails(function () {
+      new TypedArray(-1); // eslint-disable-line no-new
+    }) || !$iterDetect(function (iter) {
+      new TypedArray(); // eslint-disable-line no-new
+      new TypedArray(null); // eslint-disable-line no-new
+      new TypedArray(1.5); // eslint-disable-line no-new
+      new TypedArray(iter); // eslint-disable-line no-new
+    }, true)) {
+      TypedArray = wrapper(function (that, data, $offset, $length) {
+        anInstance(that, TypedArray, NAME);
+        var klass;
+        // `ws` module bug, temporarily remove validation length for Uint8Array
+        // https://github.com/websockets/ws/pull/645
+        if (!isObject(data)) return new Base(toIndex(data));
+        if (data instanceof $ArrayBuffer || (klass = classof(data)) == ARRAY_BUFFER || klass == SHARED_BUFFER) {
+          return $length !== undefined
+            ? new Base(data, toOffset($offset, BYTES), $length)
+            : $offset !== undefined
+              ? new Base(data, toOffset($offset, BYTES))
+              : new Base(data);
+        }
+        if (TYPED_ARRAY in data) return fromList(TypedArray, data);
+        return $from.call(TypedArray, data);
+      });
+      arrayForEach(TAC !== Function.prototype ? gOPN(Base).concat(gOPN(TAC)) : gOPN(Base), function (key) {
+        if (!(key in TypedArray)) hide(TypedArray, key, Base[key]);
+      });
+      TypedArray[PROTOTYPE] = TypedArrayPrototype;
+      if (!LIBRARY) TypedArrayPrototype.constructor = TypedArray;
+    }
+    var $nativeIterator = TypedArrayPrototype[ITERATOR];
+    var CORRECT_ITER_NAME = !!$nativeIterator
+      && ($nativeIterator.name == 'values' || $nativeIterator.name == undefined);
+    var $iterator = $iterators.values;
+    hide(TypedArray, TYPED_CONSTRUCTOR, true);
+    hide(TypedArrayPrototype, TYPED_ARRAY, NAME);
+    hide(TypedArrayPrototype, VIEW, true);
+    hide(TypedArrayPrototype, DEF_CONSTRUCTOR, TypedArray);
+
+    if (CLAMPED ? new TypedArray(1)[TAG] != NAME : !(TAG in TypedArrayPrototype)) {
+      dP(TypedArrayPrototype, TAG, {
+        get: function () { return NAME; }
+      });
+    }
+
+    O[NAME] = TypedArray;
+
+    $export($export.G + $export.W + $export.F * (TypedArray != Base), O);
+
+    $export($export.S, NAME, {
+      BYTES_PER_ELEMENT: BYTES
+    });
+
+    $export($export.S + $export.F * fails(function () { Base.of.call(TypedArray, 1); }), NAME, {
+      from: $from,
+      of: $of
+    });
+
+    if (!(BYTES_PER_ELEMENT in TypedArrayPrototype)) hide(TypedArrayPrototype, BYTES_PER_ELEMENT, BYTES);
+
+    $export($export.P, NAME, proto);
+
+    setSpecies(NAME);
+
+    $export($export.P + $export.F * FORCED_SET, NAME, { set: $set });
+
+    $export($export.P + $export.F * !CORRECT_ITER_NAME, NAME, $iterators);
+
+    if (!LIBRARY && TypedArrayPrototype.toString != arrayToString) TypedArrayPrototype.toString = arrayToString;
+
+    $export($export.P + $export.F * fails(function () {
+      new TypedArray(1).slice();
+    }), NAME, { slice: $slice });
+
+    $export($export.P + $export.F * (fails(function () {
+      return [1, 2].toLocaleString() != new TypedArray([1, 2]).toLocaleString();
+    }) || !fails(function () {
+      TypedArrayPrototype.toLocaleString.call([1, 2]);
+    })), NAME, { toLocaleString: $toLocaleString });
+
+    Iterators[NAME] = CORRECT_ITER_NAME ? $nativeIterator : $iterator;
+    if (!LIBRARY && !CORRECT_ITER_NAME) hide(TypedArrayPrototype, ITERATOR, $iterator);
+  };
+} else module.exports = function () { /* empty */ };
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_typed-buffer.js":
+/*!************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/_typed-buffer.js ***!
+  \************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var global = __webpack_require__(/*! ./_global */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_global.js");
+var DESCRIPTORS = __webpack_require__(/*! ./_descriptors */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_descriptors.js");
+var LIBRARY = __webpack_require__(/*! ./_library */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_library.js");
+var $typed = __webpack_require__(/*! ./_typed */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_typed.js");
+var hide = __webpack_require__(/*! ./_hide */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_hide.js");
+var redefineAll = __webpack_require__(/*! ./_redefine-all */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_redefine-all.js");
+var fails = __webpack_require__(/*! ./_fails */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_fails.js");
+var anInstance = __webpack_require__(/*! ./_an-instance */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_an-instance.js");
+var toInteger = __webpack_require__(/*! ./_to-integer */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_to-integer.js");
+var toLength = __webpack_require__(/*! ./_to-length */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_to-length.js");
+var toIndex = __webpack_require__(/*! ./_to-index */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_to-index.js");
+var gOPN = __webpack_require__(/*! ./_object-gopn */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_object-gopn.js").f;
+var dP = __webpack_require__(/*! ./_object-dp */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_object-dp.js").f;
+var arrayFill = __webpack_require__(/*! ./_array-fill */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_array-fill.js");
+var setToStringTag = __webpack_require__(/*! ./_set-to-string-tag */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_set-to-string-tag.js");
+var ARRAY_BUFFER = 'ArrayBuffer';
+var DATA_VIEW = 'DataView';
+var PROTOTYPE = 'prototype';
+var WRONG_LENGTH = 'Wrong length!';
+var WRONG_INDEX = 'Wrong index!';
+var $ArrayBuffer = global[ARRAY_BUFFER];
+var $DataView = global[DATA_VIEW];
+var Math = global.Math;
+var RangeError = global.RangeError;
+// eslint-disable-next-line no-shadow-restricted-names
+var Infinity = global.Infinity;
+var BaseBuffer = $ArrayBuffer;
+var abs = Math.abs;
+var pow = Math.pow;
+var floor = Math.floor;
+var log = Math.log;
+var LN2 = Math.LN2;
+var BUFFER = 'buffer';
+var BYTE_LENGTH = 'byteLength';
+var BYTE_OFFSET = 'byteOffset';
+var $BUFFER = DESCRIPTORS ? '_b' : BUFFER;
+var $LENGTH = DESCRIPTORS ? '_l' : BYTE_LENGTH;
+var $OFFSET = DESCRIPTORS ? '_o' : BYTE_OFFSET;
+
+// IEEE754 conversions based on https://github.com/feross/ieee754
+function packIEEE754(value, mLen, nBytes) {
+  var buffer = new Array(nBytes);
+  var eLen = nBytes * 8 - mLen - 1;
+  var eMax = (1 << eLen) - 1;
+  var eBias = eMax >> 1;
+  var rt = mLen === 23 ? pow(2, -24) - pow(2, -77) : 0;
+  var i = 0;
+  var s = value < 0 || value === 0 && 1 / value < 0 ? 1 : 0;
+  var e, m, c;
+  value = abs(value);
+  // eslint-disable-next-line no-self-compare
+  if (value != value || value === Infinity) {
+    // eslint-disable-next-line no-self-compare
+    m = value != value ? 1 : 0;
+    e = eMax;
+  } else {
+    e = floor(log(value) / LN2);
+    if (value * (c = pow(2, -e)) < 1) {
