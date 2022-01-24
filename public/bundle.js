@@ -6902,3 +6902,197 @@ $export($export.S, 'Math', {
     var arg, div;
     while (i < aLen) {
       arg = abs(arguments[i++]);
+      if (larg < arg) {
+        div = larg / arg;
+        sum = sum * div * div + 1;
+        larg = arg;
+      } else if (arg > 0) {
+        div = arg / larg;
+        sum += div * div;
+      } else sum += arg;
+    }
+    return larg === Infinity ? Infinity : larg * Math.sqrt(sum);
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.imul.js":
+/*!************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.imul.js ***!
+  \************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 20.2.2.18 Math.imul(x, y)
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+var $imul = Math.imul;
+
+// some WebKit versions fails with big numbers, some has wrong arity
+$export($export.S + $export.F * __webpack_require__(/*! ./_fails */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_fails.js")(function () {
+  return $imul(0xffffffff, 5) != -5 || $imul.length != 2;
+}), 'Math', {
+  imul: function imul(x, y) {
+    var UINT16 = 0xffff;
+    var xn = +x;
+    var yn = +y;
+    var xl = UINT16 & xn;
+    var yl = UINT16 & yn;
+    return 0 | xl * yl + ((UINT16 & xn >>> 16) * yl + xl * (UINT16 & yn >>> 16) << 16 >>> 0);
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.log10.js":
+/*!*************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.log10.js ***!
+  \*************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 20.2.2.21 Math.log10(x)
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+
+$export($export.S, 'Math', {
+  log10: function log10(x) {
+    return Math.log(x) * Math.LOG10E;
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.log1p.js":
+/*!*************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.log1p.js ***!
+  \*************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 20.2.2.20 Math.log1p(x)
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+
+$export($export.S, 'Math', { log1p: __webpack_require__(/*! ./_math-log1p */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_math-log1p.js") });
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.log2.js":
+/*!************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.log2.js ***!
+  \************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 20.2.2.22 Math.log2(x)
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+
+$export($export.S, 'Math', {
+  log2: function log2(x) {
+    return Math.log(x) / Math.LN2;
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.sign.js":
+/*!************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.sign.js ***!
+  \************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 20.2.2.28 Math.sign(x)
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+
+$export($export.S, 'Math', { sign: __webpack_require__(/*! ./_math-sign */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_math-sign.js") });
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.sinh.js":
+/*!************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.sinh.js ***!
+  \************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 20.2.2.30 Math.sinh(x)
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+var expm1 = __webpack_require__(/*! ./_math-expm1 */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_math-expm1.js");
+var exp = Math.exp;
+
+// V8 near Chromium 38 has a problem with very small numbers
+$export($export.S + $export.F * __webpack_require__(/*! ./_fails */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_fails.js")(function () {
+  return !Math.sinh(-2e-17) != -2e-17;
+}), 'Math', {
+  sinh: function sinh(x) {
+    return Math.abs(x = +x) < 1
+      ? (expm1(x) - expm1(-x)) / 2
+      : (exp(x - 1) - exp(-x - 1)) * (Math.E / 2);
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.tanh.js":
+/*!************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.tanh.js ***!
+  \************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 20.2.2.33 Math.tanh(x)
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+var expm1 = __webpack_require__(/*! ./_math-expm1 */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_math-expm1.js");
+var exp = Math.exp;
+
+$export($export.S, 'Math', {
+  tanh: function tanh(x) {
+    var a = expm1(x = +x);
+    var b = expm1(-x);
+    return a == Infinity ? 1 : b == Infinity ? -1 : (a - b) / (exp(x) + exp(-x));
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.trunc.js":
+/*!*************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.math.trunc.js ***!
+  \*************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 20.2.2.34 Math.trunc(x)
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+
+$export($export.S, 'Math', {
+  trunc: function trunc(it) {
+    return (it > 0 ? Math.floor : Math.ceil)(it);
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.number.constructor.js":
+/*!*********************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.number.constructor.js ***!
+  \*********************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var global = __webpack_require__(/*! ./_global */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_global.js");
+var has = __webpack_require__(/*! ./_has */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_has.js");
+var cof = __webpack_require__(/*! ./_cof */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_cof.js");
+var inheritIfRequired = __webpack_require__(/*! ./_inherit-if-required */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_inherit-if-required.js");
+var toPrimitive = __webpack_require__(/*! ./_to-primitive */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_to-primitive.js");
