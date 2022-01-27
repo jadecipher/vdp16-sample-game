@@ -8417,3 +8417,173 @@ $export($export.S, 'Reflect', { ownKeys: __webpack_require__(/*! ./_own-keys */ 
 var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
 var anObject = __webpack_require__(/*! ./_an-object */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_an-object.js");
 var $preventExtensions = Object.preventExtensions;
+
+$export($export.S, 'Reflect', {
+  preventExtensions: function preventExtensions(target) {
+    anObject(target);
+    try {
+      if ($preventExtensions) $preventExtensions(target);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.reflect.set-prototype-of.js":
+/*!***************************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.reflect.set-prototype-of.js ***!
+  \***************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 26.1.14 Reflect.setPrototypeOf(target, proto)
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+var setProto = __webpack_require__(/*! ./_set-proto */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_set-proto.js");
+
+if (setProto) $export($export.S, 'Reflect', {
+  setPrototypeOf: function setPrototypeOf(target, proto) {
+    setProto.check(target, proto);
+    try {
+      setProto.set(target, proto);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.reflect.set.js":
+/*!**************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.reflect.set.js ***!
+  \**************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 26.1.13 Reflect.set(target, propertyKey, V [, receiver])
+var dP = __webpack_require__(/*! ./_object-dp */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_object-dp.js");
+var gOPD = __webpack_require__(/*! ./_object-gopd */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_object-gopd.js");
+var getPrototypeOf = __webpack_require__(/*! ./_object-gpo */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_object-gpo.js");
+var has = __webpack_require__(/*! ./_has */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_has.js");
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+var createDesc = __webpack_require__(/*! ./_property-desc */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_property-desc.js");
+var anObject = __webpack_require__(/*! ./_an-object */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_an-object.js");
+var isObject = __webpack_require__(/*! ./_is-object */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_is-object.js");
+
+function set(target, propertyKey, V /* , receiver */) {
+  var receiver = arguments.length < 4 ? target : arguments[3];
+  var ownDesc = gOPD.f(anObject(target), propertyKey);
+  var existingDescriptor, proto;
+  if (!ownDesc) {
+    if (isObject(proto = getPrototypeOf(target))) {
+      return set(proto, propertyKey, V, receiver);
+    }
+    ownDesc = createDesc(0);
+  }
+  if (has(ownDesc, 'value')) {
+    if (ownDesc.writable === false || !isObject(receiver)) return false;
+    if (existingDescriptor = gOPD.f(receiver, propertyKey)) {
+      if (existingDescriptor.get || existingDescriptor.set || existingDescriptor.writable === false) return false;
+      existingDescriptor.value = V;
+      dP.f(receiver, propertyKey, existingDescriptor);
+    } else dP.f(receiver, propertyKey, createDesc(0, V));
+    return true;
+  }
+  return ownDesc.set === undefined ? false : (ownDesc.set.call(receiver, V), true);
+}
+
+$export($export.S, 'Reflect', { set: set });
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.regexp.constructor.js":
+/*!*********************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.regexp.constructor.js ***!
+  \*********************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var global = __webpack_require__(/*! ./_global */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_global.js");
+var inheritIfRequired = __webpack_require__(/*! ./_inherit-if-required */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_inherit-if-required.js");
+var dP = __webpack_require__(/*! ./_object-dp */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_object-dp.js").f;
+var gOPN = __webpack_require__(/*! ./_object-gopn */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_object-gopn.js").f;
+var isRegExp = __webpack_require__(/*! ./_is-regexp */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_is-regexp.js");
+var $flags = __webpack_require__(/*! ./_flags */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_flags.js");
+var $RegExp = global.RegExp;
+var Base = $RegExp;
+var proto = $RegExp.prototype;
+var re1 = /a/g;
+var re2 = /a/g;
+// "new" creates a new object, old webkit buggy here
+var CORRECT_NEW = new $RegExp(re1) !== re1;
+
+if (__webpack_require__(/*! ./_descriptors */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_descriptors.js") && (!CORRECT_NEW || __webpack_require__(/*! ./_fails */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_fails.js")(function () {
+  re2[__webpack_require__(/*! ./_wks */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_wks.js")('match')] = false;
+  // RegExp constructor can alter flags and IsRegExp works correct with @@match
+  return $RegExp(re1) != re1 || $RegExp(re2) == re2 || $RegExp(re1, 'i') != '/a/i';
+}))) {
+  $RegExp = function RegExp(p, f) {
+    var tiRE = this instanceof $RegExp;
+    var piRE = isRegExp(p);
+    var fiU = f === undefined;
+    return !tiRE && piRE && p.constructor === $RegExp && fiU ? p
+      : inheritIfRequired(CORRECT_NEW
+        ? new Base(piRE && !fiU ? p.source : p, f)
+        : Base((piRE = p instanceof $RegExp) ? p.source : p, piRE && fiU ? $flags.call(p) : f)
+      , tiRE ? this : proto, $RegExp);
+  };
+  var proxy = function (key) {
+    key in $RegExp || dP($RegExp, key, {
+      configurable: true,
+      get: function () { return Base[key]; },
+      set: function (it) { Base[key] = it; }
+    });
+  };
+  for (var keys = gOPN(Base), i = 0; keys.length > i;) proxy(keys[i++]);
+  proto.constructor = $RegExp;
+  $RegExp.prototype = proto;
+  __webpack_require__(/*! ./_redefine */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_redefine.js")(global, 'RegExp', $RegExp);
+}
+
+__webpack_require__(/*! ./_set-species */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_set-species.js")('RegExp');
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.regexp.exec.js":
+/*!**************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.regexp.exec.js ***!
+  \**************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var regexpExec = __webpack_require__(/*! ./_regexp-exec */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_regexp-exec.js");
+__webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js")({
+  target: 'RegExp',
+  proto: true,
+  forced: regexpExec !== /./.exec
+}, {
+  exec: regexpExec
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.regexp.flags.js":
+/*!***************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.regexp.flags.js ***!
+  \***************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+// 21.2.5.3 get RegExp.prototype.flags()
+if (__webpack_require__(/*! ./_descriptors */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_descriptors.js") && /./g.flags != 'g') __webpack_require__(/*! ./_object-dp */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_object-dp.js").f(RegExp.prototype, 'flags', {
