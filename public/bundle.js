@@ -9131,3 +9131,178 @@ $export($export.P, 'String', {
   \*******************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+// 21.1.3.6 String.prototype.endsWith(searchString [, endPosition])
+
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+var toLength = __webpack_require__(/*! ./_to-length */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_to-length.js");
+var context = __webpack_require__(/*! ./_string-context */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-context.js");
+var ENDS_WITH = 'endsWith';
+var $endsWith = ''[ENDS_WITH];
+
+$export($export.P + $export.F * __webpack_require__(/*! ./_fails-is-regexp */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_fails-is-regexp.js")(ENDS_WITH), 'String', {
+  endsWith: function endsWith(searchString /* , endPosition = @length */) {
+    var that = context(this, searchString, ENDS_WITH);
+    var endPosition = arguments.length > 1 ? arguments[1] : undefined;
+    var len = toLength(that.length);
+    var end = endPosition === undefined ? len : Math.min(toLength(endPosition), len);
+    var search = String(searchString);
+    return $endsWith
+      ? $endsWith.call(that, search, end)
+      : that.slice(end - search.length, end) === search;
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.fixed.js":
+/*!***************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.fixed.js ***!
+  \***************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+// B.2.3.6 String.prototype.fixed()
+__webpack_require__(/*! ./_string-html */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-html.js")('fixed', function (createHTML) {
+  return function fixed() {
+    return createHTML(this, 'tt', '', '');
+  };
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.fontcolor.js":
+/*!*******************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.fontcolor.js ***!
+  \*******************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+// B.2.3.7 String.prototype.fontcolor(color)
+__webpack_require__(/*! ./_string-html */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-html.js")('fontcolor', function (createHTML) {
+  return function fontcolor(color) {
+    return createHTML(this, 'font', 'color', color);
+  };
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.fontsize.js":
+/*!******************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.fontsize.js ***!
+  \******************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+// B.2.3.8 String.prototype.fontsize(size)
+__webpack_require__(/*! ./_string-html */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-html.js")('fontsize', function (createHTML) {
+  return function fontsize(size) {
+    return createHTML(this, 'font', 'size', size);
+  };
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.from-code-point.js":
+/*!*************************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.from-code-point.js ***!
+  \*************************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+var toAbsoluteIndex = __webpack_require__(/*! ./_to-absolute-index */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_to-absolute-index.js");
+var fromCharCode = String.fromCharCode;
+var $fromCodePoint = String.fromCodePoint;
+
+// length should be 1, old FF problem
+$export($export.S + $export.F * (!!$fromCodePoint && $fromCodePoint.length != 1), 'String', {
+  // 21.1.2.2 String.fromCodePoint(...codePoints)
+  fromCodePoint: function fromCodePoint(x) { // eslint-disable-line no-unused-vars
+    var res = [];
+    var aLen = arguments.length;
+    var i = 0;
+    var code;
+    while (aLen > i) {
+      code = +arguments[i++];
+      if (toAbsoluteIndex(code, 0x10ffff) !== code) throw RangeError(code + ' is not a valid code point');
+      res.push(code < 0x10000
+        ? fromCharCode(code)
+        : fromCharCode(((code -= 0x10000) >> 10) + 0xd800, code % 0x400 + 0xdc00)
+      );
+    } return res.join('');
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.includes.js":
+/*!******************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.includes.js ***!
+  \******************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+// 21.1.3.7 String.prototype.includes(searchString, position = 0)
+
+var $export = __webpack_require__(/*! ./_export */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_export.js");
+var context = __webpack_require__(/*! ./_string-context */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-context.js");
+var INCLUDES = 'includes';
+
+$export($export.P + $export.F * __webpack_require__(/*! ./_fails-is-regexp */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_fails-is-regexp.js")(INCLUDES), 'String', {
+  includes: function includes(searchString /* , position = 0 */) {
+    return !!~context(this, searchString, INCLUDES)
+      .indexOf(searchString, arguments.length > 1 ? arguments[1] : undefined);
+  }
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.italics.js":
+/*!*****************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.italics.js ***!
+  \*****************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+// B.2.3.9 String.prototype.italics()
+__webpack_require__(/*! ./_string-html */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-html.js")('italics', function (createHTML) {
+  return function italics() {
+    return createHTML(this, 'i', '', '');
+  };
+});
+
+
+/***/ }),
+
+/***/ "./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.iterator.js":
+/*!******************************************************************************************!*\
+  !*** ./node_modules/@babel/polyfill/node_modules/core-js/modules/es6.string.iterator.js ***!
+  \******************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var $at = __webpack_require__(/*! ./_string-at */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_string-at.js")(true);
+
+// 21.1.3.27 String.prototype[@@iterator]()
+__webpack_require__(/*! ./_iter-define */ "./node_modules/@babel/polyfill/node_modules/core-js/modules/_iter-define.js")(String, 'String', function (iterated) {
+  this._t = String(iterated); // target
+  this._i = 0;                // next index
