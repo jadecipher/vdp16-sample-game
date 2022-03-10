@@ -22254,3 +22254,168 @@ var injection = {
    */
   injectEventPluginsByName: injectEventPluginsByName
 };
+
+/**
+ * @param {object} inst The instance, which is the source of events.
+ * @param {string} registrationName Name of listener (e.g. `onClick`).
+ * @return {?function} The stored callback.
+ */
+function getListener(inst, registrationName) {
+  var listener = void 0;
+
+  // TODO: shouldPreventMouseEvent is DOM-specific and definitely should not
+  // live here; needs to be moved to a better place soon
+  var stateNode = inst.stateNode;
+  if (!stateNode) {
+    // Work in progress (ex: onload events in incremental mode).
+    return null;
+  }
+  var props = getFiberCurrentPropsFromNode(stateNode);
+  if (!props) {
+    // Work in progress.
+    return null;
+  }
+  listener = props[registrationName];
+  if (shouldPreventMouseEvent(registrationName, inst.type, props)) {
+    return null;
+  }
+  !(!listener || typeof listener === 'function') ? invariant(false, 'Expected `%s` listener to be a function, instead got a value of `%s` type.', registrationName, typeof listener) : void 0;
+  return listener;
+}
+
+/**
+ * Allows registered plugins an opportunity to extract events from top-level
+ * native browser events.
+ *
+ * @return {*} An accumulation of synthetic events.
+ * @internal
+ */
+function extractEvents(topLevelType, targetInst, nativeEvent, nativeEventTarget) {
+  var events = null;
+  for (var i = 0; i < plugins.length; i++) {
+    // Not every plugin in the ordering may be loaded at runtime.
+    var possiblePlugin = plugins[i];
+    if (possiblePlugin) {
+      var extractedEvents = possiblePlugin.extractEvents(topLevelType, targetInst, nativeEvent, nativeEventTarget);
+      if (extractedEvents) {
+        events = accumulateInto(events, extractedEvents);
+      }
+    }
+  }
+  return events;
+}
+
+function runEventsInBatch(events) {
+  if (events !== null) {
+    eventQueue = accumulateInto(eventQueue, events);
+  }
+
+  // Set `eventQueue` to null before processing it so that we can tell if more
+  // events get enqueued while processing.
+  var processingEventQueue = eventQueue;
+  eventQueue = null;
+
+  if (!processingEventQueue) {
+    return;
+  }
+
+  forEachAccumulated(processingEventQueue, executeDispatchesAndReleaseTopLevel);
+  !!eventQueue ? invariant(false, 'processEventQueue(): Additional events were enqueued while processing an event queue. Support for this has not yet been implemented.') : void 0;
+  // This would be a good time to rethrow if any of the event handlers threw.
+  rethrowCaughtError();
+}
+
+function runExtractedEventsInBatch(topLevelType, targetInst, nativeEvent, nativeEventTarget) {
+  var events = extractEvents(topLevelType, targetInst, nativeEvent, nativeEventTarget);
+  runEventsInBatch(events);
+}
+
+var FunctionComponent = 0;
+var ClassComponent = 1;
+var IndeterminateComponent = 2; // Before we know whether it is function or class
+var HostRoot = 3; // Root of a host tree. Could be nested inside another node.
+var HostPortal = 4; // A subtree. Could be an entry point to a different renderer.
+var HostComponent = 5;
+var HostText = 6;
+var Fragment = 7;
+var Mode = 8;
+var ContextConsumer = 9;
+var ContextProvider = 10;
+var ForwardRef = 11;
+var Profiler = 12;
+var SuspenseComponent = 13;
+var MemoComponent = 14;
+var SimpleMemoComponent = 15;
+var LazyComponent = 16;
+var IncompleteClassComponent = 17;
+var DehydratedSuspenseComponent = 18;
+
+var randomKey = Math.random().toString(36).slice(2);
+var internalInstanceKey = '__reactInternalInstance$' + randomKey;
+var internalEventHandlersKey = '__reactEventHandlers$' + randomKey;
+
+function precacheFiberNode(hostInst, node) {
+  node[internalInstanceKey] = hostInst;
+}
+
+/**
+ * Given a DOM node, return the closest ReactDOMComponent or
+ * ReactDOMTextComponent instance ancestor.
+ */
+function getClosestInstanceFromNode(node) {
+  if (node[internalInstanceKey]) {
+    return node[internalInstanceKey];
+  }
+
+  while (!node[internalInstanceKey]) {
+    if (node.parentNode) {
+      node = node.parentNode;
+    } else {
+      // Top of the tree. This node must not be part of a React tree (or is
+      // unmounted, potentially).
+      return null;
+    }
+  }
+
+  var inst = node[internalInstanceKey];
+  if (inst.tag === HostComponent || inst.tag === HostText) {
+    // In Fiber, this will always be the deepest root.
+    return inst;
+  }
+
+  return null;
+}
+
+/**
+ * Given a DOM node, return the ReactDOMComponent or ReactDOMTextComponent
+ * instance, or null if the node was not rendered by this React.
+ */
+function getInstanceFromNode$1(node) {
+  var inst = node[internalInstanceKey];
+  if (inst) {
+    if (inst.tag === HostComponent || inst.tag === HostText) {
+      return inst;
+    } else {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Given a ReactDOMComponent or ReactDOMTextComponent, return the corresponding
+ * DOM node.
+ */
+function getNodeFromInstance$1(inst) {
+  if (inst.tag === HostComponent || inst.tag === HostText) {
+    // In Fiber this, is just the state node right now. We assume it will be
+    // a host component or host text.
+    return inst.stateNode;
+  }
+
+  // Without this first invariant, passing a non-DOM-component triggers the next
+  // invariant for a missing parent, which is super confusing.
+  invariant(false, 'getNodeFromInstance: Invalid argument.');
+}
+
+function getFiberCurrentPropsFromNode$1(node) {
