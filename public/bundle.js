@@ -23608,3 +23608,215 @@ function enqueueStateRestore(target) {
     restoreTarget = target;
   }
 }
+
+function needsStateRestore() {
+  return restoreTarget !== null || restoreQueue !== null;
+}
+
+function restoreStateIfNeeded() {
+  if (!restoreTarget) {
+    return;
+  }
+  var target = restoreTarget;
+  var queuedTargets = restoreQueue;
+  restoreTarget = null;
+  restoreQueue = null;
+
+  restoreStateOfTarget(target);
+  if (queuedTargets) {
+    for (var i = 0; i < queuedTargets.length; i++) {
+      restoreStateOfTarget(queuedTargets[i]);
+    }
+  }
+}
+
+// Used as a way to call batchedUpdates when we don't have a reference to
+// the renderer. Such as when we're dispatching events or if third party
+// libraries need to call batchedUpdates. Eventually, this API will go away when
+// everything is batched by default. We'll then have a similar API to opt-out of
+// scheduled work and instead do synchronous work.
+
+// Defaults
+var _batchedUpdatesImpl = function (fn, bookkeeping) {
+  return fn(bookkeeping);
+};
+var _interactiveUpdatesImpl = function (fn, a, b) {
+  return fn(a, b);
+};
+var _flushInteractiveUpdatesImpl = function () {};
+
+var isBatching = false;
+function batchedUpdates(fn, bookkeeping) {
+  if (isBatching) {
+    // If we are currently inside another batch, we need to wait until it
+    // fully completes before restoring state.
+    return fn(bookkeeping);
+  }
+  isBatching = true;
+  try {
+    return _batchedUpdatesImpl(fn, bookkeeping);
+  } finally {
+    // Here we wait until all updates have propagated, which is important
+    // when using controlled components within layers:
+    // https://github.com/facebook/react/issues/1698
+    // Then we restore state of any controlled component.
+    isBatching = false;
+    var controlledComponentsHavePendingUpdates = needsStateRestore();
+    if (controlledComponentsHavePendingUpdates) {
+      // If a controlled event was fired, we may need to restore the state of
+      // the DOM node back to the controlled value. This is necessary when React
+      // bails out of the update without touching the DOM.
+      _flushInteractiveUpdatesImpl();
+      restoreStateIfNeeded();
+    }
+  }
+}
+
+function interactiveUpdates(fn, a, b) {
+  return _interactiveUpdatesImpl(fn, a, b);
+}
+
+
+
+function setBatchingImplementation(batchedUpdatesImpl, interactiveUpdatesImpl, flushInteractiveUpdatesImpl) {
+  _batchedUpdatesImpl = batchedUpdatesImpl;
+  _interactiveUpdatesImpl = interactiveUpdatesImpl;
+  _flushInteractiveUpdatesImpl = flushInteractiveUpdatesImpl;
+}
+
+/**
+ * @see http://www.whatwg.org/specs/web-apps/current-work/multipage/the-input-element.html#input-type-attr-summary
+ */
+var supportedInputTypes = {
+  color: true,
+  date: true,
+  datetime: true,
+  'datetime-local': true,
+  email: true,
+  month: true,
+  number: true,
+  password: true,
+  range: true,
+  search: true,
+  tel: true,
+  text: true,
+  time: true,
+  url: true,
+  week: true
+};
+
+function isTextInputElement(elem) {
+  var nodeName = elem && elem.nodeName && elem.nodeName.toLowerCase();
+
+  if (nodeName === 'input') {
+    return !!supportedInputTypes[elem.type];
+  }
+
+  if (nodeName === 'textarea') {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * HTML nodeType values that represent the type of the node
+ */
+
+var ELEMENT_NODE = 1;
+var TEXT_NODE = 3;
+var COMMENT_NODE = 8;
+var DOCUMENT_NODE = 9;
+var DOCUMENT_FRAGMENT_NODE = 11;
+
+/**
+ * Gets the target node from a native browser event by accounting for
+ * inconsistencies in browser DOM APIs.
+ *
+ * @param {object} nativeEvent Native browser event.
+ * @return {DOMEventTarget} Target node.
+ */
+function getEventTarget(nativeEvent) {
+  // Fallback to nativeEvent.srcElement for IE9
+  // https://github.com/facebook/react/issues/12506
+  var target = nativeEvent.target || nativeEvent.srcElement || window;
+
+  // Normalize SVG <use> element events #4963
+  if (target.correspondingUseElement) {
+    target = target.correspondingUseElement;
+  }
+
+  // Safari may fire events on text nodes (Node.TEXT_NODE is 3).
+  // @see http://www.quirksmode.org/js/events_properties.html
+  return target.nodeType === TEXT_NODE ? target.parentNode : target;
+}
+
+/**
+ * Checks if an event is supported in the current execution environment.
+ *
+ * NOTE: This will not work correctly for non-generic events such as `change`,
+ * `reset`, `load`, `error`, and `select`.
+ *
+ * Borrows from Modernizr.
+ *
+ * @param {string} eventNameSuffix Event name, e.g. "click".
+ * @return {boolean} True if the event is supported.
+ * @internal
+ * @license Modernizr 3.0.0pre (Custom Build) | MIT
+ */
+function isEventSupported(eventNameSuffix) {
+  if (!canUseDOM) {
+    return false;
+  }
+
+  var eventName = 'on' + eventNameSuffix;
+  var isSupported = eventName in document;
+
+  if (!isSupported) {
+    var element = document.createElement('div');
+    element.setAttribute(eventName, 'return;');
+    isSupported = typeof element[eventName] === 'function';
+  }
+
+  return isSupported;
+}
+
+function isCheckable(elem) {
+  var type = elem.type;
+  var nodeName = elem.nodeName;
+  return nodeName && nodeName.toLowerCase() === 'input' && (type === 'checkbox' || type === 'radio');
+}
+
+function getTracker(node) {
+  return node._valueTracker;
+}
+
+function detachTracker(node) {
+  node._valueTracker = null;
+}
+
+function getValueFromNode(node) {
+  var value = '';
+  if (!node) {
+    return value;
+  }
+
+  if (isCheckable(node)) {
+    value = node.checked ? 'true' : 'false';
+  } else {
+    value = node.value;
+  }
+
+  return value;
+}
+
+function trackValueOnNode(node) {
+  var valueField = isCheckable(node) ? 'checked' : 'value';
+  var descriptor = Object.getOwnPropertyDescriptor(node.constructor.prototype, valueField);
+
+  var currentValue = '' + node[valueField];
+
+  // if someone has already defined a value or Safari, then bail
+  // and don't track value will cause over reporting of changes,
+  // but it's better then a hard failure
+  // (needed for certain tests that spyOn input values and Safari)
