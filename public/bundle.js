@@ -23230,3 +23230,187 @@ var eventTypes = {
     dependencies: [TOP_BLUR, TOP_COMPOSITION_START, TOP_KEY_DOWN, TOP_KEY_PRESS, TOP_KEY_UP, TOP_MOUSE_DOWN]
   },
   compositionUpdate: {
+    phasedRegistrationNames: {
+      bubbled: 'onCompositionUpdate',
+      captured: 'onCompositionUpdateCapture'
+    },
+    dependencies: [TOP_BLUR, TOP_COMPOSITION_UPDATE, TOP_KEY_DOWN, TOP_KEY_PRESS, TOP_KEY_UP, TOP_MOUSE_DOWN]
+  }
+};
+
+// Track whether we've ever handled a keypress on the space key.
+var hasSpaceKeypress = false;
+
+/**
+ * Return whether a native keypress event is assumed to be a command.
+ * This is required because Firefox fires `keypress` events for key commands
+ * (cut, copy, select-all, etc.) even though no character is inserted.
+ */
+function isKeypressCommand(nativeEvent) {
+  return (nativeEvent.ctrlKey || nativeEvent.altKey || nativeEvent.metaKey) &&
+  // ctrlKey && altKey is equivalent to AltGr, and is not a command.
+  !(nativeEvent.ctrlKey && nativeEvent.altKey);
+}
+
+/**
+ * Translate native top level events into event types.
+ *
+ * @param {string} topLevelType
+ * @return {object}
+ */
+function getCompositionEventType(topLevelType) {
+  switch (topLevelType) {
+    case TOP_COMPOSITION_START:
+      return eventTypes.compositionStart;
+    case TOP_COMPOSITION_END:
+      return eventTypes.compositionEnd;
+    case TOP_COMPOSITION_UPDATE:
+      return eventTypes.compositionUpdate;
+  }
+}
+
+/**
+ * Does our fallback best-guess model think this event signifies that
+ * composition has begun?
+ *
+ * @param {string} topLevelType
+ * @param {object} nativeEvent
+ * @return {boolean}
+ */
+function isFallbackCompositionStart(topLevelType, nativeEvent) {
+  return topLevelType === TOP_KEY_DOWN && nativeEvent.keyCode === START_KEYCODE;
+}
+
+/**
+ * Does our fallback mode think that this event is the end of composition?
+ *
+ * @param {string} topLevelType
+ * @param {object} nativeEvent
+ * @return {boolean}
+ */
+function isFallbackCompositionEnd(topLevelType, nativeEvent) {
+  switch (topLevelType) {
+    case TOP_KEY_UP:
+      // Command keys insert or clear IME input.
+      return END_KEYCODES.indexOf(nativeEvent.keyCode) !== -1;
+    case TOP_KEY_DOWN:
+      // Expect IME keyCode on each keydown. If we get any other
+      // code we must have exited earlier.
+      return nativeEvent.keyCode !== START_KEYCODE;
+    case TOP_KEY_PRESS:
+    case TOP_MOUSE_DOWN:
+    case TOP_BLUR:
+      // Events are not possible without cancelling IME.
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Google Input Tools provides composition data via a CustomEvent,
+ * with the `data` property populated in the `detail` object. If this
+ * is available on the event object, use it. If not, this is a plain
+ * composition event and we have nothing special to extract.
+ *
+ * @param {object} nativeEvent
+ * @return {?string}
+ */
+function getDataFromCustomEvent(nativeEvent) {
+  var detail = nativeEvent.detail;
+  if (typeof detail === 'object' && 'data' in detail) {
+    return detail.data;
+  }
+  return null;
+}
+
+/**
+ * Check if a composition event was triggered by Korean IME.
+ * Our fallback mode does not work well with IE's Korean IME,
+ * so just use native composition events when Korean IME is used.
+ * Although CompositionEvent.locale property is deprecated,
+ * it is available in IE, where our fallback mode is enabled.
+ *
+ * @param {object} nativeEvent
+ * @return {boolean}
+ */
+function isUsingKoreanIME(nativeEvent) {
+  return nativeEvent.locale === 'ko';
+}
+
+// Track the current IME composition status, if any.
+var isComposing = false;
+
+/**
+ * @return {?object} A SyntheticCompositionEvent.
+ */
+function extractCompositionEvent(topLevelType, targetInst, nativeEvent, nativeEventTarget) {
+  var eventType = void 0;
+  var fallbackData = void 0;
+
+  if (canUseCompositionEvent) {
+    eventType = getCompositionEventType(topLevelType);
+  } else if (!isComposing) {
+    if (isFallbackCompositionStart(topLevelType, nativeEvent)) {
+      eventType = eventTypes.compositionStart;
+    }
+  } else if (isFallbackCompositionEnd(topLevelType, nativeEvent)) {
+    eventType = eventTypes.compositionEnd;
+  }
+
+  if (!eventType) {
+    return null;
+  }
+
+  if (useFallbackCompositionData && !isUsingKoreanIME(nativeEvent)) {
+    // The current composition is stored statically and must not be
+    // overwritten while composition continues.
+    if (!isComposing && eventType === eventTypes.compositionStart) {
+      isComposing = initialize(nativeEventTarget);
+    } else if (eventType === eventTypes.compositionEnd) {
+      if (isComposing) {
+        fallbackData = getData();
+      }
+    }
+  }
+
+  var event = SyntheticCompositionEvent.getPooled(eventType, targetInst, nativeEvent, nativeEventTarget);
+
+  if (fallbackData) {
+    // Inject data generated from fallback path into the synthetic event.
+    // This matches the property of native CompositionEventInterface.
+    event.data = fallbackData;
+  } else {
+    var customData = getDataFromCustomEvent(nativeEvent);
+    if (customData !== null) {
+      event.data = customData;
+    }
+  }
+
+  accumulateTwoPhaseDispatches(event);
+  return event;
+}
+
+/**
+ * @param {TopLevelType} topLevelType Number from `TopLevelType`.
+ * @param {object} nativeEvent Native browser event.
+ * @return {?string} The string corresponding to this `beforeInput` event.
+ */
+function getNativeBeforeInputChars(topLevelType, nativeEvent) {
+  switch (topLevelType) {
+    case TOP_COMPOSITION_END:
+      return getDataFromCustomEvent(nativeEvent);
+    case TOP_KEY_PRESS:
+      /**
+       * If native `textInput` events are available, our goal is to make
+       * use of them. However, there is a special case: the spacebar key.
+       * In Webkit, preventing default on a spacebar `textInput` event
+       * cancels character insertion, but it *also* causes the browser
+       * to fall back to its default spacebar behavior of scrolling the
+       * page.
+       *
+       * Tracking at:
+       * https://code.google.com/p/chromium/issues/detail?id=355103
+       *
+       * To avoid this issue, use the keypress event as if no `textInput`
+       * event is available.
