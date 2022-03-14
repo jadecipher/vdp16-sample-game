@@ -24365,3 +24365,198 @@ var properties = {};
 
 // These are HTML attributes that must be positive numbers.
 ['cols', 'rows', 'size', 'span'].forEach(function (name) {
+  properties[name] = new PropertyInfoRecord(name, POSITIVE_NUMERIC, false, // mustUseProperty
+  name, // attributeName
+  null);
+} // attributeNamespace
+);
+
+// These are HTML attributes that must be numbers.
+['rowSpan', 'start'].forEach(function (name) {
+  properties[name] = new PropertyInfoRecord(name, NUMERIC, false, // mustUseProperty
+  name.toLowerCase(), // attributeName
+  null);
+} // attributeNamespace
+);
+
+var CAMELIZE = /[\-\:]([a-z])/g;
+var capitalize = function (token) {
+  return token[1].toUpperCase();
+};
+
+// This is a list of all SVG attributes that need special casing, namespacing,
+// or boolean value assignment. Regular attributes that just accept strings
+// and have the same names are omitted, just like in the HTML whitelist.
+// Some of these attributes can be hard to find. This list was created by
+// scrapping the MDN documentation.
+['accent-height', 'alignment-baseline', 'arabic-form', 'baseline-shift', 'cap-height', 'clip-path', 'clip-rule', 'color-interpolation', 'color-interpolation-filters', 'color-profile', 'color-rendering', 'dominant-baseline', 'enable-background', 'fill-opacity', 'fill-rule', 'flood-color', 'flood-opacity', 'font-family', 'font-size', 'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight', 'glyph-name', 'glyph-orientation-horizontal', 'glyph-orientation-vertical', 'horiz-adv-x', 'horiz-origin-x', 'image-rendering', 'letter-spacing', 'lighting-color', 'marker-end', 'marker-mid', 'marker-start', 'overline-position', 'overline-thickness', 'paint-order', 'panose-1', 'pointer-events', 'rendering-intent', 'shape-rendering', 'stop-color', 'stop-opacity', 'strikethrough-position', 'strikethrough-thickness', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-opacity', 'stroke-width', 'text-anchor', 'text-decoration', 'text-rendering', 'underline-position', 'underline-thickness', 'unicode-bidi', 'unicode-range', 'units-per-em', 'v-alphabetic', 'v-hanging', 'v-ideographic', 'v-mathematical', 'vector-effect', 'vert-adv-y', 'vert-origin-x', 'vert-origin-y', 'word-spacing', 'writing-mode', 'xmlns:xlink', 'x-height'].forEach(function (attributeName) {
+  var name = attributeName.replace(CAMELIZE, capitalize);
+  properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
+  attributeName, null);
+} // attributeNamespace
+);
+
+// String SVG attributes with the xlink namespace.
+['xlink:actuate', 'xlink:arcrole', 'xlink:href', 'xlink:role', 'xlink:show', 'xlink:title', 'xlink:type'].forEach(function (attributeName) {
+  var name = attributeName.replace(CAMELIZE, capitalize);
+  properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
+  attributeName, 'http://www.w3.org/1999/xlink');
+});
+
+// String SVG attributes with the xml namespace.
+['xml:base', 'xml:lang', 'xml:space'].forEach(function (attributeName) {
+  var name = attributeName.replace(CAMELIZE, capitalize);
+  properties[name] = new PropertyInfoRecord(name, STRING, false, // mustUseProperty
+  attributeName, 'http://www.w3.org/XML/1998/namespace');
+});
+
+// These attribute exists both in HTML and SVG.
+// The attribute name is case-sensitive in SVG so we can't just use
+// the React name like we do for attributes that exist only in HTML.
+['tabIndex', 'crossOrigin'].forEach(function (attributeName) {
+  properties[attributeName] = new PropertyInfoRecord(attributeName, STRING, false, // mustUseProperty
+  attributeName.toLowerCase(), // attributeName
+  null);
+} // attributeNamespace
+);
+
+/**
+ * Get the value for a property on a node. Only used in DEV for SSR validation.
+ * The "expected" argument is used as a hint of what the expected value is.
+ * Some properties have multiple equivalent values.
+ */
+function getValueForProperty(node, name, expected, propertyInfo) {
+  {
+    if (propertyInfo.mustUseProperty) {
+      var propertyName = propertyInfo.propertyName;
+
+      return node[propertyName];
+    } else {
+      var attributeName = propertyInfo.attributeName;
+
+      var stringValue = null;
+
+      if (propertyInfo.type === OVERLOADED_BOOLEAN) {
+        if (node.hasAttribute(attributeName)) {
+          var value = node.getAttribute(attributeName);
+          if (value === '') {
+            return true;
+          }
+          if (shouldRemoveAttribute(name, expected, propertyInfo, false)) {
+            return value;
+          }
+          if (value === '' + expected) {
+            return expected;
+          }
+          return value;
+        }
+      } else if (node.hasAttribute(attributeName)) {
+        if (shouldRemoveAttribute(name, expected, propertyInfo, false)) {
+          // We had an attribute but shouldn't have had one, so read it
+          // for the error message.
+          return node.getAttribute(attributeName);
+        }
+        if (propertyInfo.type === BOOLEAN) {
+          // If this was a boolean, it doesn't matter what the value is
+          // the fact that we have it is the same as the expected.
+          return expected;
+        }
+        // Even if this property uses a namespace we use getAttribute
+        // because we assume its namespaced name is the same as our config.
+        // To use getAttributeNS we need the local name which we don't have
+        // in our config atm.
+        stringValue = node.getAttribute(attributeName);
+      }
+
+      if (shouldRemoveAttribute(name, expected, propertyInfo, false)) {
+        return stringValue === null ? expected : stringValue;
+      } else if (stringValue === '' + expected) {
+        return expected;
+      } else {
+        return stringValue;
+      }
+    }
+  }
+}
+
+/**
+ * Get the value for a attribute on a node. Only used in DEV for SSR validation.
+ * The third argument is used as a hint of what the expected value is. Some
+ * attributes have multiple equivalent values.
+ */
+function getValueForAttribute(node, name, expected) {
+  {
+    if (!isAttributeNameSafe(name)) {
+      return;
+    }
+    if (!node.hasAttribute(name)) {
+      return expected === undefined ? undefined : null;
+    }
+    var value = node.getAttribute(name);
+    if (value === '' + expected) {
+      return expected;
+    }
+    return value;
+  }
+}
+
+/**
+ * Sets the value for a property on a node.
+ *
+ * @param {DOMElement} node
+ * @param {string} name
+ * @param {*} value
+ */
+function setValueForProperty(node, name, value, isCustomComponentTag) {
+  var propertyInfo = getPropertyInfo(name);
+  if (shouldIgnoreAttribute(name, propertyInfo, isCustomComponentTag)) {
+    return;
+  }
+  if (shouldRemoveAttribute(name, value, propertyInfo, isCustomComponentTag)) {
+    value = null;
+  }
+  // If the prop isn't in the special list, treat it as a simple attribute.
+  if (isCustomComponentTag || propertyInfo === null) {
+    if (isAttributeNameSafe(name)) {
+      var _attributeName = name;
+      if (value === null) {
+        node.removeAttribute(_attributeName);
+      } else {
+        node.setAttribute(_attributeName, '' + value);
+      }
+    }
+    return;
+  }
+  var mustUseProperty = propertyInfo.mustUseProperty;
+
+  if (mustUseProperty) {
+    var propertyName = propertyInfo.propertyName;
+
+    if (value === null) {
+      var type = propertyInfo.type;
+
+      node[propertyName] = type === BOOLEAN ? false : '';
+    } else {
+      // Contrary to `setAttribute`, object properties are properly
+      // `toString`ed by IE8/9.
+      node[propertyName] = value;
+    }
+    return;
+  }
+  // The rest are treated as attributes with special cases.
+  var attributeName = propertyInfo.attributeName,
+      attributeNamespace = propertyInfo.attributeNamespace;
+
+  if (value === null) {
+    node.removeAttribute(attributeName);
+  } else {
+    var _type = propertyInfo.type;
+
+    var attributeValue = void 0;
+    if (_type === BOOLEAN || _type === OVERLOADED_BOOLEAN && value === true) {
+      attributeValue = '';
+    } else {
+      // `setAttribute` with objects becomes only `[object]` in IE8/9,
+      // ('' + value) makes it output the correct toString()-value.
+      attributeValue = '' + value;
+    }
