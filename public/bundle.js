@@ -25117,3 +25117,166 @@ function handlePropertyChange(nativeEvent) {
 function handleEventsForInputEventPolyfill(topLevelType, target, targetInst) {
   if (topLevelType === TOP_FOCUS) {
     // In IE9, propertychange fires for most input events but is buggy and
+    // doesn't fire when text is deleted, but conveniently, selectionchange
+    // appears to fire in all of the remaining cases so we catch those and
+    // forward the event if the value has changed
+    // In either case, we don't want to call the event handler if the value
+    // is changed from JS so we redefine a setter for `.value` that updates
+    // our activeElementValue variable, allowing us to ignore those changes
+    //
+    // stopWatching() should be a noop here but we call it just in case we
+    // missed a blur event somehow.
+    stopWatchingForValueChange();
+    startWatchingForValueChange(target, targetInst);
+  } else if (topLevelType === TOP_BLUR) {
+    stopWatchingForValueChange();
+  }
+}
+
+// For IE8 and IE9.
+function getTargetInstForInputEventPolyfill(topLevelType, targetInst) {
+  if (topLevelType === TOP_SELECTION_CHANGE || topLevelType === TOP_KEY_UP || topLevelType === TOP_KEY_DOWN) {
+    // On the selectionchange event, the target is just document which isn't
+    // helpful for us so just check activeElement instead.
+    //
+    // 99% of the time, keydown and keyup aren't necessary. IE8 fails to fire
+    // propertychange on the first input event after setting `value` from a
+    // script and fires only keydown, keypress, keyup. Catching keyup usually
+    // gets it and catching keydown lets us fire an event for the first
+    // keystroke if user does a key repeat (it'll be a little delayed: right
+    // before the second keystroke). Other input methods (e.g., paste) seem to
+    // fire selectionchange normally.
+    return getInstIfValueChanged(activeElementInst);
+  }
+}
+
+/**
+ * SECTION: handle `click` event
+ */
+function shouldUseClickEvent(elem) {
+  // Use the `click` event to detect changes to checkbox and radio inputs.
+  // This approach works across all browsers, whereas `change` does not fire
+  // until `blur` in IE8.
+  var nodeName = elem.nodeName;
+  return nodeName && nodeName.toLowerCase() === 'input' && (elem.type === 'checkbox' || elem.type === 'radio');
+}
+
+function getTargetInstForClickEvent(topLevelType, targetInst) {
+  if (topLevelType === TOP_CLICK) {
+    return getInstIfValueChanged(targetInst);
+  }
+}
+
+function getTargetInstForInputOrChangeEvent(topLevelType, targetInst) {
+  if (topLevelType === TOP_INPUT || topLevelType === TOP_CHANGE) {
+    return getInstIfValueChanged(targetInst);
+  }
+}
+
+function handleControlledInputBlur(node) {
+  var state = node._wrapperState;
+
+  if (!state || !state.controlled || node.type !== 'number') {
+    return;
+  }
+
+  if (!disableInputAttributeSyncing) {
+    // If controlled, assign the value attribute to the current value on blur
+    setDefaultValue(node, 'number', node.value);
+  }
+}
+
+/**
+ * This plugin creates an `onChange` event that normalizes change events
+ * across form elements. This event fires at a time when it's possible to
+ * change the element's value without seeing a flicker.
+ *
+ * Supported elements are:
+ * - input (see `isTextInputElement`)
+ * - textarea
+ * - select
+ */
+var ChangeEventPlugin = {
+  eventTypes: eventTypes$1,
+
+  _isInputEventSupported: isInputEventSupported,
+
+  extractEvents: function (topLevelType, targetInst, nativeEvent, nativeEventTarget) {
+    var targetNode = targetInst ? getNodeFromInstance$1(targetInst) : window;
+
+    var getTargetInstFunc = void 0,
+        handleEventFunc = void 0;
+    if (shouldUseChangeEvent(targetNode)) {
+      getTargetInstFunc = getTargetInstForChangeEvent;
+    } else if (isTextInputElement(targetNode)) {
+      if (isInputEventSupported) {
+        getTargetInstFunc = getTargetInstForInputOrChangeEvent;
+      } else {
+        getTargetInstFunc = getTargetInstForInputEventPolyfill;
+        handleEventFunc = handleEventsForInputEventPolyfill;
+      }
+    } else if (shouldUseClickEvent(targetNode)) {
+      getTargetInstFunc = getTargetInstForClickEvent;
+    }
+
+    if (getTargetInstFunc) {
+      var inst = getTargetInstFunc(topLevelType, targetInst);
+      if (inst) {
+        var event = createAndAccumulateChangeEvent(inst, nativeEvent, nativeEventTarget);
+        return event;
+      }
+    }
+
+    if (handleEventFunc) {
+      handleEventFunc(topLevelType, targetNode, targetInst);
+    }
+
+    // When blurring, set the value attribute for number inputs
+    if (topLevelType === TOP_BLUR) {
+      handleControlledInputBlur(targetNode);
+    }
+  }
+};
+
+/**
+ * Module that is injectable into `EventPluginHub`, that specifies a
+ * deterministic ordering of `EventPlugin`s. A convenient way to reason about
+ * plugins, without having to package every one of them. This is better than
+ * having plugins be ordered in the same order that they are injected because
+ * that ordering would be influenced by the packaging order.
+ * `ResponderEventPlugin` must occur before `SimpleEventPlugin` so that
+ * preventing default on events is convenient in `SimpleEventPlugin` handlers.
+ */
+var DOMEventPluginOrder = ['ResponderEventPlugin', 'SimpleEventPlugin', 'EnterLeaveEventPlugin', 'ChangeEventPlugin', 'SelectEventPlugin', 'BeforeInputEventPlugin'];
+
+var SyntheticUIEvent = SyntheticEvent.extend({
+  view: null,
+  detail: null
+});
+
+var modifierKeyToProp = {
+  Alt: 'altKey',
+  Control: 'ctrlKey',
+  Meta: 'metaKey',
+  Shift: 'shiftKey'
+};
+
+// Older browsers (Safari <= 10, iOS Safari <= 10.2) do not support
+// getModifierState. If getModifierState is not supported, we map it to a set of
+// modifier keys exposed by the event. In this case, Lock-keys are not supported.
+/**
+ * Translation from modifier key to the associated property in the event.
+ * @see http://www.w3.org/TR/DOM-Level-3-Events/#keys-Modifiers
+ */
+
+function modifierStateGetter(keyArg) {
+  var syntheticEvent = this;
+  var nativeEvent = syntheticEvent.nativeEvent;
+  if (nativeEvent.getModifierState) {
+    return nativeEvent.getModifierState(keyArg);
+  }
+  var keyProp = modifierKeyToProp[keyArg];
+  return keyProp ? !!nativeEvent[keyProp] : false;
+}
+
+function getEventModifierState(nativeEvent) {
