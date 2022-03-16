@@ -25461,3 +25461,188 @@ var EnterLeaveEventPlugin = {
     enter.type = eventTypePrefix + 'enter';
     enter.target = toNode;
     enter.relatedTarget = fromNode;
+
+    accumulateEnterLeaveDispatches(leave, enter, from, to);
+
+    return [leave, enter];
+  }
+};
+
+/**
+ * inlined Object.is polyfill to avoid requiring consumers ship their own
+ * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is
+ */
+function is(x, y) {
+  return x === y && (x !== 0 || 1 / x === 1 / y) || x !== x && y !== y // eslint-disable-line no-self-compare
+  ;
+}
+
+var hasOwnProperty$1 = Object.prototype.hasOwnProperty;
+
+/**
+ * Performs equality by iterating through keys on an object and returning false
+ * when any key has values which are not strictly equal between the arguments.
+ * Returns true when the values of all keys are strictly equal.
+ */
+function shallowEqual(objA, objB) {
+  if (is(objA, objB)) {
+    return true;
+  }
+
+  if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
+    return false;
+  }
+
+  var keysA = Object.keys(objA);
+  var keysB = Object.keys(objB);
+
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+
+  // Test for A's keys different from B.
+  for (var i = 0; i < keysA.length; i++) {
+    if (!hasOwnProperty$1.call(objB, keysA[i]) || !is(objA[keysA[i]], objB[keysA[i]])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * `ReactInstanceMap` maintains a mapping from a public facing stateful
+ * instance (key) and the internal representation (value). This allows public
+ * methods to accept the user facing instance as an argument and map them back
+ * to internal methods.
+ *
+ * Note that this module is currently shared and assumed to be stateless.
+ * If this becomes an actual Map, that will break.
+ */
+
+/**
+ * This API should be called `delete` but we'd have to make sure to always
+ * transform these to strings for IE support. When this transform is fully
+ * supported we can rename it.
+ */
+
+
+function get(key) {
+  return key._reactInternalFiber;
+}
+
+function has(key) {
+  return key._reactInternalFiber !== undefined;
+}
+
+function set(key, value) {
+  key._reactInternalFiber = value;
+}
+
+// Don't change these two values. They're used by React Dev Tools.
+var NoEffect = /*              */0;
+var PerformedWork = /*         */1;
+
+// You can change the rest (and add more).
+var Placement = /*             */2;
+var Update = /*                */4;
+var PlacementAndUpdate = /*    */6;
+var Deletion = /*              */8;
+var ContentReset = /*          */16;
+var Callback = /*              */32;
+var DidCapture = /*            */64;
+var Ref = /*                   */128;
+var Snapshot = /*              */256;
+var Passive = /*               */512;
+
+// Passive & Update & Callback & Ref & Snapshot
+var LifecycleEffectMask = /*   */932;
+
+// Union of all host effects
+var HostEffectMask = /*        */1023;
+
+var Incomplete = /*            */1024;
+var ShouldCapture = /*         */2048;
+
+var ReactCurrentOwner$1 = ReactSharedInternals.ReactCurrentOwner;
+
+var MOUNTING = 1;
+var MOUNTED = 2;
+var UNMOUNTED = 3;
+
+function isFiberMountedImpl(fiber) {
+  var node = fiber;
+  if (!fiber.alternate) {
+    // If there is no alternate, this might be a new tree that isn't inserted
+    // yet. If it is, then it will have a pending insertion effect on it.
+    if ((node.effectTag & Placement) !== NoEffect) {
+      return MOUNTING;
+    }
+    while (node.return) {
+      node = node.return;
+      if ((node.effectTag & Placement) !== NoEffect) {
+        return MOUNTING;
+      }
+    }
+  } else {
+    while (node.return) {
+      node = node.return;
+    }
+  }
+  if (node.tag === HostRoot) {
+    // TODO: Check if this was a nested HostRoot when used with
+    // renderContainerIntoSubtree.
+    return MOUNTED;
+  }
+  // If we didn't hit the root, that means that we're in an disconnected tree
+  // that has been unmounted.
+  return UNMOUNTED;
+}
+
+function isFiberMounted(fiber) {
+  return isFiberMountedImpl(fiber) === MOUNTED;
+}
+
+function isMounted(component) {
+  {
+    var owner = ReactCurrentOwner$1.current;
+    if (owner !== null && owner.tag === ClassComponent) {
+      var ownerFiber = owner;
+      var instance = ownerFiber.stateNode;
+      !instance._warnedAboutRefsInRender ? warningWithoutStack$1(false, '%s is accessing isMounted inside its render() function. ' + 'render() should be a pure function of props and state. It should ' + 'never access something that requires stale data from the previous ' + 'render, such as refs. Move this logic to componentDidMount and ' + 'componentDidUpdate instead.', getComponentName(ownerFiber.type) || 'A component') : void 0;
+      instance._warnedAboutRefsInRender = true;
+    }
+  }
+
+  var fiber = get(component);
+  if (!fiber) {
+    return false;
+  }
+  return isFiberMountedImpl(fiber) === MOUNTED;
+}
+
+function assertIsMounted(fiber) {
+  !(isFiberMountedImpl(fiber) === MOUNTED) ? invariant(false, 'Unable to find node on an unmounted component.') : void 0;
+}
+
+function findCurrentFiberUsingSlowPath(fiber) {
+  var alternate = fiber.alternate;
+  if (!alternate) {
+    // If there is no alternate, then we only need to check if it is mounted.
+    var state = isFiberMountedImpl(fiber);
+    !(state !== UNMOUNTED) ? invariant(false, 'Unable to find node on an unmounted component.') : void 0;
+    if (state === MOUNTING) {
+      return null;
+    }
+    return fiber;
+  }
+  // If we have two possible branches, we'll walk backwards up to the root
+  // to see what path the root points to. On the way we may hit one of the
+  // special cases and we'll deal with them.
+  var a = fiber;
+  var b = alternate;
+  while (true) {
+    var parentA = a.return;
+    var parentB = parentA ? parentA.alternate : null;
+    if (!parentA || !parentB) {
+      // We're at the root.
