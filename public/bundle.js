@@ -27545,3 +27545,174 @@ function getChildNamespace(parentNamespace, type) {
     return HTML_NAMESPACE$1;
   }
   // By default, pass namespace below.
+  return parentNamespace;
+}
+
+/* globals MSApp */
+
+/**
+ * Create a function which has 'unsafe' privileges (required by windows8 apps)
+ */
+var createMicrosoftUnsafeLocalFunction = function (func) {
+  if (typeof MSApp !== 'undefined' && MSApp.execUnsafeLocalFunction) {
+    return function (arg0, arg1, arg2, arg3) {
+      MSApp.execUnsafeLocalFunction(function () {
+        return func(arg0, arg1, arg2, arg3);
+      });
+    };
+  } else {
+    return func;
+  }
+};
+
+// SVG temp container for IE lacking innerHTML
+var reusableSVGContainer = void 0;
+
+/**
+ * Set the innerHTML property of a node
+ *
+ * @param {DOMElement} node
+ * @param {string} html
+ * @internal
+ */
+var setInnerHTML = createMicrosoftUnsafeLocalFunction(function (node, html) {
+  // IE does not have innerHTML for SVG nodes, so instead we inject the
+  // new markup in a temp node and then move the child nodes across into
+  // the target node
+
+  if (node.namespaceURI === Namespaces.svg && !('innerHTML' in node)) {
+    reusableSVGContainer = reusableSVGContainer || document.createElement('div');
+    reusableSVGContainer.innerHTML = '<svg>' + html + '</svg>';
+    var svgNode = reusableSVGContainer.firstChild;
+    while (node.firstChild) {
+      node.removeChild(node.firstChild);
+    }
+    while (svgNode.firstChild) {
+      node.appendChild(svgNode.firstChild);
+    }
+  } else {
+    node.innerHTML = html;
+  }
+});
+
+/**
+ * Set the textContent property of a node. For text updates, it's faster
+ * to set the `nodeValue` of the Text node directly instead of using
+ * `.textContent` which will remove the existing node and create a new one.
+ *
+ * @param {DOMElement} node
+ * @param {string} text
+ * @internal
+ */
+var setTextContent = function (node, text) {
+  if (text) {
+    var firstChild = node.firstChild;
+
+    if (firstChild && firstChild === node.lastChild && firstChild.nodeType === TEXT_NODE) {
+      firstChild.nodeValue = text;
+      return;
+    }
+  }
+  node.textContent = text;
+};
+
+// List derived from Gecko source code:
+// https://github.com/mozilla/gecko-dev/blob/4e638efc71/layout/style/test/property_database.js
+var shorthandToLonghand = {
+  animation: ['animationDelay', 'animationDirection', 'animationDuration', 'animationFillMode', 'animationIterationCount', 'animationName', 'animationPlayState', 'animationTimingFunction'],
+  background: ['backgroundAttachment', 'backgroundClip', 'backgroundColor', 'backgroundImage', 'backgroundOrigin', 'backgroundPositionX', 'backgroundPositionY', 'backgroundRepeat', 'backgroundSize'],
+  backgroundPosition: ['backgroundPositionX', 'backgroundPositionY'],
+  border: ['borderBottomColor', 'borderBottomStyle', 'borderBottomWidth', 'borderImageOutset', 'borderImageRepeat', 'borderImageSlice', 'borderImageSource', 'borderImageWidth', 'borderLeftColor', 'borderLeftStyle', 'borderLeftWidth', 'borderRightColor', 'borderRightStyle', 'borderRightWidth', 'borderTopColor', 'borderTopStyle', 'borderTopWidth'],
+  borderBlockEnd: ['borderBlockEndColor', 'borderBlockEndStyle', 'borderBlockEndWidth'],
+  borderBlockStart: ['borderBlockStartColor', 'borderBlockStartStyle', 'borderBlockStartWidth'],
+  borderBottom: ['borderBottomColor', 'borderBottomStyle', 'borderBottomWidth'],
+  borderColor: ['borderBottomColor', 'borderLeftColor', 'borderRightColor', 'borderTopColor'],
+  borderImage: ['borderImageOutset', 'borderImageRepeat', 'borderImageSlice', 'borderImageSource', 'borderImageWidth'],
+  borderInlineEnd: ['borderInlineEndColor', 'borderInlineEndStyle', 'borderInlineEndWidth'],
+  borderInlineStart: ['borderInlineStartColor', 'borderInlineStartStyle', 'borderInlineStartWidth'],
+  borderLeft: ['borderLeftColor', 'borderLeftStyle', 'borderLeftWidth'],
+  borderRadius: ['borderBottomLeftRadius', 'borderBottomRightRadius', 'borderTopLeftRadius', 'borderTopRightRadius'],
+  borderRight: ['borderRightColor', 'borderRightStyle', 'borderRightWidth'],
+  borderStyle: ['borderBottomStyle', 'borderLeftStyle', 'borderRightStyle', 'borderTopStyle'],
+  borderTop: ['borderTopColor', 'borderTopStyle', 'borderTopWidth'],
+  borderWidth: ['borderBottomWidth', 'borderLeftWidth', 'borderRightWidth', 'borderTopWidth'],
+  columnRule: ['columnRuleColor', 'columnRuleStyle', 'columnRuleWidth'],
+  columns: ['columnCount', 'columnWidth'],
+  flex: ['flexBasis', 'flexGrow', 'flexShrink'],
+  flexFlow: ['flexDirection', 'flexWrap'],
+  font: ['fontFamily', 'fontFeatureSettings', 'fontKerning', 'fontLanguageOverride', 'fontSize', 'fontSizeAdjust', 'fontStretch', 'fontStyle', 'fontVariant', 'fontVariantAlternates', 'fontVariantCaps', 'fontVariantEastAsian', 'fontVariantLigatures', 'fontVariantNumeric', 'fontVariantPosition', 'fontWeight', 'lineHeight'],
+  fontVariant: ['fontVariantAlternates', 'fontVariantCaps', 'fontVariantEastAsian', 'fontVariantLigatures', 'fontVariantNumeric', 'fontVariantPosition'],
+  gap: ['columnGap', 'rowGap'],
+  grid: ['gridAutoColumns', 'gridAutoFlow', 'gridAutoRows', 'gridTemplateAreas', 'gridTemplateColumns', 'gridTemplateRows'],
+  gridArea: ['gridColumnEnd', 'gridColumnStart', 'gridRowEnd', 'gridRowStart'],
+  gridColumn: ['gridColumnEnd', 'gridColumnStart'],
+  gridColumnGap: ['columnGap'],
+  gridGap: ['columnGap', 'rowGap'],
+  gridRow: ['gridRowEnd', 'gridRowStart'],
+  gridRowGap: ['rowGap'],
+  gridTemplate: ['gridTemplateAreas', 'gridTemplateColumns', 'gridTemplateRows'],
+  listStyle: ['listStyleImage', 'listStylePosition', 'listStyleType'],
+  margin: ['marginBottom', 'marginLeft', 'marginRight', 'marginTop'],
+  marker: ['markerEnd', 'markerMid', 'markerStart'],
+  mask: ['maskClip', 'maskComposite', 'maskImage', 'maskMode', 'maskOrigin', 'maskPositionX', 'maskPositionY', 'maskRepeat', 'maskSize'],
+  maskPosition: ['maskPositionX', 'maskPositionY'],
+  outline: ['outlineColor', 'outlineStyle', 'outlineWidth'],
+  overflow: ['overflowX', 'overflowY'],
+  padding: ['paddingBottom', 'paddingLeft', 'paddingRight', 'paddingTop'],
+  placeContent: ['alignContent', 'justifyContent'],
+  placeItems: ['alignItems', 'justifyItems'],
+  placeSelf: ['alignSelf', 'justifySelf'],
+  textDecoration: ['textDecorationColor', 'textDecorationLine', 'textDecorationStyle'],
+  textEmphasis: ['textEmphasisColor', 'textEmphasisStyle'],
+  transition: ['transitionDelay', 'transitionDuration', 'transitionProperty', 'transitionTimingFunction'],
+  wordWrap: ['overflowWrap']
+};
+
+/**
+ * CSS properties which accept numbers but are not in units of "px".
+ */
+var isUnitlessNumber = {
+  animationIterationCount: true,
+  borderImageOutset: true,
+  borderImageSlice: true,
+  borderImageWidth: true,
+  boxFlex: true,
+  boxFlexGroup: true,
+  boxOrdinalGroup: true,
+  columnCount: true,
+  columns: true,
+  flex: true,
+  flexGrow: true,
+  flexPositive: true,
+  flexShrink: true,
+  flexNegative: true,
+  flexOrder: true,
+  gridArea: true,
+  gridRow: true,
+  gridRowEnd: true,
+  gridRowSpan: true,
+  gridRowStart: true,
+  gridColumn: true,
+  gridColumnEnd: true,
+  gridColumnSpan: true,
+  gridColumnStart: true,
+  fontWeight: true,
+  lineClamp: true,
+  lineHeight: true,
+  opacity: true,
+  order: true,
+  orphans: true,
+  tabSize: true,
+  widows: true,
+  zIndex: true,
+  zoom: true,
+
+  // SVG-related properties
+  fillOpacity: true,
+  floodOpacity: true,
+  stopOpacity: true,
+  strokeDasharray: true,
+  strokeDashoffset: true,
+  strokeMiterlimit: true,
+  strokeOpacity: true,
+  strokeWidth: true
