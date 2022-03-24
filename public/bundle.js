@@ -27716,3 +27716,202 @@ var isUnitlessNumber = {
   strokeMiterlimit: true,
   strokeOpacity: true,
   strokeWidth: true
+};
+
+/**
+ * @param {string} prefix vendor-specific prefix, eg: Webkit
+ * @param {string} key style name, eg: transitionDuration
+ * @return {string} style name prefixed with `prefix`, properly camelCased, eg:
+ * WebkitTransitionDuration
+ */
+function prefixKey(prefix, key) {
+  return prefix + key.charAt(0).toUpperCase() + key.substring(1);
+}
+
+/**
+ * Support style names that may come passed in prefixed by adding permutations
+ * of vendor prefixes.
+ */
+var prefixes = ['Webkit', 'ms', 'Moz', 'O'];
+
+// Using Object.keys here, or else the vanilla for-in loop makes IE8 go into an
+// infinite loop, because it iterates over the newly added props too.
+Object.keys(isUnitlessNumber).forEach(function (prop) {
+  prefixes.forEach(function (prefix) {
+    isUnitlessNumber[prefixKey(prefix, prop)] = isUnitlessNumber[prop];
+  });
+});
+
+/**
+ * Convert a value into the proper css writable value. The style name `name`
+ * should be logical (no hyphens), as specified
+ * in `CSSProperty.isUnitlessNumber`.
+ *
+ * @param {string} name CSS property name such as `topMargin`.
+ * @param {*} value CSS property value such as `10px`.
+ * @return {string} Normalized style value with dimensions applied.
+ */
+function dangerousStyleValue(name, value, isCustomProperty) {
+  // Note that we've removed escapeTextForBrowser() calls here since the
+  // whole string will be escaped when the attribute is injected into
+  // the markup. If you provide unsafe user data here they can inject
+  // arbitrary CSS which may be problematic (I couldn't repro this):
+  // https://www.owasp.org/index.php/XSS_Filter_Evasion_Cheat_Sheet
+  // http://www.thespanner.co.uk/2007/11/26/ultimate-xss-css-injection/
+  // This is not an XSS hole but instead a potential CSS injection issue
+  // which has lead to a greater discussion about how we're going to
+  // trust URLs moving forward. See #2115901
+
+  var isEmpty = value == null || typeof value === 'boolean' || value === '';
+  if (isEmpty) {
+    return '';
+  }
+
+  if (!isCustomProperty && typeof value === 'number' && value !== 0 && !(isUnitlessNumber.hasOwnProperty(name) && isUnitlessNumber[name])) {
+    return value + 'px'; // Presumes implicit 'px' suffix for unitless numbers
+  }
+
+  return ('' + value).trim();
+}
+
+var uppercasePattern = /([A-Z])/g;
+var msPattern = /^ms-/;
+
+/**
+ * Hyphenates a camelcased CSS property name, for example:
+ *
+ *   > hyphenateStyleName('backgroundColor')
+ *   < "background-color"
+ *   > hyphenateStyleName('MozTransition')
+ *   < "-moz-transition"
+ *   > hyphenateStyleName('msTransition')
+ *   < "-ms-transition"
+ *
+ * As Modernizr suggests (http://modernizr.com/docs/#prefixed), an `ms` prefix
+ * is converted to `-ms-`.
+ */
+function hyphenateStyleName(name) {
+  return name.replace(uppercasePattern, '-$1').toLowerCase().replace(msPattern, '-ms-');
+}
+
+var warnValidStyle = function () {};
+
+{
+  // 'msTransform' is correct, but the other prefixes should be capitalized
+  var badVendoredStyleNamePattern = /^(?:webkit|moz|o)[A-Z]/;
+  var msPattern$1 = /^-ms-/;
+  var hyphenPattern = /-(.)/g;
+
+  // style values shouldn't contain a semicolon
+  var badStyleValueWithSemicolonPattern = /;\s*$/;
+
+  var warnedStyleNames = {};
+  var warnedStyleValues = {};
+  var warnedForNaNValue = false;
+  var warnedForInfinityValue = false;
+
+  var camelize = function (string) {
+    return string.replace(hyphenPattern, function (_, character) {
+      return character.toUpperCase();
+    });
+  };
+
+  var warnHyphenatedStyleName = function (name) {
+    if (warnedStyleNames.hasOwnProperty(name) && warnedStyleNames[name]) {
+      return;
+    }
+
+    warnedStyleNames[name] = true;
+    warning$1(false, 'Unsupported style property %s. Did you mean %s?', name,
+    // As Andi Smith suggests
+    // (http://www.andismith.com/blog/2012/02/modernizr-prefixed/), an `-ms` prefix
+    // is converted to lowercase `ms`.
+    camelize(name.replace(msPattern$1, 'ms-')));
+  };
+
+  var warnBadVendoredStyleName = function (name) {
+    if (warnedStyleNames.hasOwnProperty(name) && warnedStyleNames[name]) {
+      return;
+    }
+
+    warnedStyleNames[name] = true;
+    warning$1(false, 'Unsupported vendor-prefixed style property %s. Did you mean %s?', name, name.charAt(0).toUpperCase() + name.slice(1));
+  };
+
+  var warnStyleValueWithSemicolon = function (name, value) {
+    if (warnedStyleValues.hasOwnProperty(value) && warnedStyleValues[value]) {
+      return;
+    }
+
+    warnedStyleValues[value] = true;
+    warning$1(false, "Style property values shouldn't contain a semicolon. " + 'Try "%s: %s" instead.', name, value.replace(badStyleValueWithSemicolonPattern, ''));
+  };
+
+  var warnStyleValueIsNaN = function (name, value) {
+    if (warnedForNaNValue) {
+      return;
+    }
+
+    warnedForNaNValue = true;
+    warning$1(false, '`NaN` is an invalid value for the `%s` css style property.', name);
+  };
+
+  var warnStyleValueIsInfinity = function (name, value) {
+    if (warnedForInfinityValue) {
+      return;
+    }
+
+    warnedForInfinityValue = true;
+    warning$1(false, '`Infinity` is an invalid value for the `%s` css style property.', name);
+  };
+
+  warnValidStyle = function (name, value) {
+    if (name.indexOf('-') > -1) {
+      warnHyphenatedStyleName(name);
+    } else if (badVendoredStyleNamePattern.test(name)) {
+      warnBadVendoredStyleName(name);
+    } else if (badStyleValueWithSemicolonPattern.test(value)) {
+      warnStyleValueWithSemicolon(name, value);
+    }
+
+    if (typeof value === 'number') {
+      if (isNaN(value)) {
+        warnStyleValueIsNaN(name, value);
+      } else if (!isFinite(value)) {
+        warnStyleValueIsInfinity(name, value);
+      }
+    }
+  };
+}
+
+var warnValidStyle$1 = warnValidStyle;
+
+/**
+ * Operations for dealing with CSS properties.
+ */
+
+/**
+ * This creates a string that is expected to be equivalent to the style
+ * attribute generated by server-side rendering. It by-passes warnings and
+ * security checks so it's not safe to use this value for anything other than
+ * comparison. It is only used in DEV for SSR validation.
+ */
+function createDangerousStringForStyles(styles) {
+  {
+    var serialized = '';
+    var delimiter = '';
+    for (var styleName in styles) {
+      if (!styles.hasOwnProperty(styleName)) {
+        continue;
+      }
+      var styleValue = styles[styleName];
+      if (styleValue != null) {
+        var isCustomProperty = styleName.indexOf('--') === 0;
+        serialized += delimiter + hyphenateStyleName(styleName) + ':';
+        serialized += dangerousStyleValue(styleName, styleValue, isCustomProperty);
+
+        delimiter = ';';
+      }
+    }
+    return serialized || null;
+  }
