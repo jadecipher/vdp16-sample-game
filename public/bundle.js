@@ -29618,3 +29618,165 @@ function diffHydratedProperties(domElement, tag, rawProps, parentNamespace, root
     var nextProp = rawProps[propKey];
     if (propKey === CHILDREN) {
       // For text content children we compare against textContent. This
+      // might match additional HTML that is hidden when we read it using
+      // textContent. E.g. "foo" will match "f<span>oo</span>" but that still
+      // satisfies our requirement. Our requirement is not to produce perfect
+      // HTML and attributes. Ideally we should preserve structure but it's
+      // ok not to if the visible content is still enough to indicate what
+      // even listeners these nodes might be wired up to.
+      // TODO: Warn if there is more than a single textNode as a child.
+      // TODO: Should we use domElement.firstChild.nodeValue to compare?
+      if (typeof nextProp === 'string') {
+        if (domElement.textContent !== nextProp) {
+          if ( true && !suppressHydrationWarning) {
+            warnForTextDifference(domElement.textContent, nextProp);
+          }
+          updatePayload = [CHILDREN, nextProp];
+        }
+      } else if (typeof nextProp === 'number') {
+        if (domElement.textContent !== '' + nextProp) {
+          if ( true && !suppressHydrationWarning) {
+            warnForTextDifference(domElement.textContent, nextProp);
+          }
+          updatePayload = [CHILDREN, '' + nextProp];
+        }
+      }
+    } else if (registrationNameModules.hasOwnProperty(propKey)) {
+      if (nextProp != null) {
+        if ( true && typeof nextProp !== 'function') {
+          warnForInvalidEventListener(propKey, nextProp);
+        }
+        ensureListeningTo(rootContainerElement, propKey);
+      }
+    } else if ( true &&
+    // Convince Flow we've calculated it (it's DEV-only in this method.)
+    typeof isCustomComponentTag === 'boolean') {
+      // Validate that the properties correspond to their expected values.
+      var serverValue = void 0;
+      var propertyInfo = getPropertyInfo(propKey);
+      if (suppressHydrationWarning) {
+        // Don't bother comparing. We're ignoring all these warnings.
+      } else if (propKey === SUPPRESS_CONTENT_EDITABLE_WARNING || propKey === SUPPRESS_HYDRATION_WARNING$1 ||
+      // Controlled attributes are not validated
+      // TODO: Only ignore them on controlled tags.
+      propKey === 'value' || propKey === 'checked' || propKey === 'selected') {
+        // Noop
+      } else if (propKey === DANGEROUSLY_SET_INNER_HTML) {
+        var serverHTML = domElement.innerHTML;
+        var nextHtml = nextProp ? nextProp[HTML] : undefined;
+        var expectedHTML = normalizeHTML(domElement, nextHtml != null ? nextHtml : '');
+        if (expectedHTML !== serverHTML) {
+          warnForPropDifference(propKey, serverHTML, expectedHTML);
+        }
+      } else if (propKey === STYLE$1) {
+        // $FlowFixMe - Should be inferred as not undefined.
+        extraAttributeNames.delete(propKey);
+
+        if (canDiffStyleForHydrationWarning) {
+          var expectedStyle = createDangerousStringForStyles(nextProp);
+          serverValue = domElement.getAttribute('style');
+          if (expectedStyle !== serverValue) {
+            warnForPropDifference(propKey, serverValue, expectedStyle);
+          }
+        }
+      } else if (isCustomComponentTag) {
+        // $FlowFixMe - Should be inferred as not undefined.
+        extraAttributeNames.delete(propKey.toLowerCase());
+        serverValue = getValueForAttribute(domElement, propKey, nextProp);
+
+        if (nextProp !== serverValue) {
+          warnForPropDifference(propKey, serverValue, nextProp);
+        }
+      } else if (!shouldIgnoreAttribute(propKey, propertyInfo, isCustomComponentTag) && !shouldRemoveAttribute(propKey, nextProp, propertyInfo, isCustomComponentTag)) {
+        var isMismatchDueToBadCasing = false;
+        if (propertyInfo !== null) {
+          // $FlowFixMe - Should be inferred as not undefined.
+          extraAttributeNames.delete(propertyInfo.attributeName);
+          serverValue = getValueForProperty(domElement, propKey, nextProp, propertyInfo);
+        } else {
+          var ownNamespace = parentNamespace;
+          if (ownNamespace === HTML_NAMESPACE) {
+            ownNamespace = getIntrinsicNamespace(tag);
+          }
+          if (ownNamespace === HTML_NAMESPACE) {
+            // $FlowFixMe - Should be inferred as not undefined.
+            extraAttributeNames.delete(propKey.toLowerCase());
+          } else {
+            var standardName = getPossibleStandardName(propKey);
+            if (standardName !== null && standardName !== propKey) {
+              // If an SVG prop is supplied with bad casing, it will
+              // be successfully parsed from HTML, but will produce a mismatch
+              // (and would be incorrectly rendered on the client).
+              // However, we already warn about bad casing elsewhere.
+              // So we'll skip the misleading extra mismatch warning in this case.
+              isMismatchDueToBadCasing = true;
+              // $FlowFixMe - Should be inferred as not undefined.
+              extraAttributeNames.delete(standardName);
+            }
+            // $FlowFixMe - Should be inferred as not undefined.
+            extraAttributeNames.delete(propKey);
+          }
+          serverValue = getValueForAttribute(domElement, propKey, nextProp);
+        }
+
+        if (nextProp !== serverValue && !isMismatchDueToBadCasing) {
+          warnForPropDifference(propKey, serverValue, nextProp);
+        }
+      }
+    }
+  }
+
+  {
+    // $FlowFixMe - Should be inferred as not undefined.
+    if (extraAttributeNames.size > 0 && !suppressHydrationWarning) {
+      // $FlowFixMe - Should be inferred as not undefined.
+      warnForExtraAttributes(extraAttributeNames);
+    }
+  }
+
+  switch (tag) {
+    case 'input':
+      // TODO: Make sure we check if this is still unmounted or do any clean
+      // up necessary since we never stop tracking anymore.
+      track(domElement);
+      postMountWrapper(domElement, rawProps, true);
+      break;
+    case 'textarea':
+      // TODO: Make sure we check if this is still unmounted or do any clean
+      // up necessary since we never stop tracking anymore.
+      track(domElement);
+      postMountWrapper$3(domElement, rawProps);
+      break;
+    case 'select':
+    case 'option':
+      // For input and textarea we current always set the value property at
+      // post mount to force it to diverge from attributes. However, for
+      // option and select we don't quite do the same thing and select
+      // is not resilient to the DOM state changing so we don't do that here.
+      // TODO: Consider not doing this for input and textarea.
+      break;
+    default:
+      if (typeof rawProps.onClick === 'function') {
+        // TODO: This cast may not be sound for SVG, MathML or custom elements.
+        trapClickOnNonInteractiveElement(domElement);
+      }
+      break;
+  }
+
+  return updatePayload;
+}
+
+function diffHydratedText(textNode, text) {
+  var isDifferent = textNode.nodeValue !== text;
+  return isDifferent;
+}
+
+function warnForUnmatchedText(textNode, text) {
+  {
+    warnForTextDifference(textNode.nodeValue, text);
+  }
+}
+
+function warnForDeletedHydratableElement(parentNode, child) {
+  {
+    if (didWarnInvalidHydration) {
