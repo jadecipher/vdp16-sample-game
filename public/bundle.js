@@ -29061,3 +29061,174 @@ function setInitialDOMProperties(tag, domElement, rootContainerElement, nextProp
       // Relies on `updateStylesByID` not mutating `styleUpdates`.
       setValueForStyles(domElement, nextProp);
     } else if (propKey === DANGEROUSLY_SET_INNER_HTML) {
+      var nextHtml = nextProp ? nextProp[HTML] : undefined;
+      if (nextHtml != null) {
+        setInnerHTML(domElement, nextHtml);
+      }
+    } else if (propKey === CHILDREN) {
+      if (typeof nextProp === 'string') {
+        // Avoid setting initial textContent when the text is empty. In IE11 setting
+        // textContent on a <textarea> will cause the placeholder to not
+        // show within the <textarea> until it has been focused and blurred again.
+        // https://github.com/facebook/react/issues/6731#issuecomment-254874553
+        var canSetTextContent = tag !== 'textarea' || nextProp !== '';
+        if (canSetTextContent) {
+          setTextContent(domElement, nextProp);
+        }
+      } else if (typeof nextProp === 'number') {
+        setTextContent(domElement, '' + nextProp);
+      }
+    } else if (propKey === SUPPRESS_CONTENT_EDITABLE_WARNING || propKey === SUPPRESS_HYDRATION_WARNING$1) {
+      // Noop
+    } else if (propKey === AUTOFOCUS) {
+      // We polyfill it separately on the client during commit.
+      // We could have excluded it in the property list instead of
+      // adding a special case here, but then it wouldn't be emitted
+      // on server rendering (but we *do* want to emit it in SSR).
+    } else if (registrationNameModules.hasOwnProperty(propKey)) {
+      if (nextProp != null) {
+        if ( true && typeof nextProp !== 'function') {
+          warnForInvalidEventListener(propKey, nextProp);
+        }
+        ensureListeningTo(rootContainerElement, propKey);
+      }
+    } else if (nextProp != null) {
+      setValueForProperty(domElement, propKey, nextProp, isCustomComponentTag);
+    }
+  }
+}
+
+function updateDOMProperties(domElement, updatePayload, wasCustomComponentTag, isCustomComponentTag) {
+  // TODO: Handle wasCustomComponentTag
+  for (var i = 0; i < updatePayload.length; i += 2) {
+    var propKey = updatePayload[i];
+    var propValue = updatePayload[i + 1];
+    if (propKey === STYLE$1) {
+      setValueForStyles(domElement, propValue);
+    } else if (propKey === DANGEROUSLY_SET_INNER_HTML) {
+      setInnerHTML(domElement, propValue);
+    } else if (propKey === CHILDREN) {
+      setTextContent(domElement, propValue);
+    } else {
+      setValueForProperty(domElement, propKey, propValue, isCustomComponentTag);
+    }
+  }
+}
+
+function createElement(type, props, rootContainerElement, parentNamespace) {
+  var isCustomComponentTag = void 0;
+
+  // We create tags in the namespace of their parent container, except HTML
+  // tags get no namespace.
+  var ownerDocument = getOwnerDocumentFromRootContainer(rootContainerElement);
+  var domElement = void 0;
+  var namespaceURI = parentNamespace;
+  if (namespaceURI === HTML_NAMESPACE) {
+    namespaceURI = getIntrinsicNamespace(type);
+  }
+  if (namespaceURI === HTML_NAMESPACE) {
+    {
+      isCustomComponentTag = isCustomComponent(type, props);
+      // Should this check be gated by parent namespace? Not sure we want to
+      // allow <SVG> or <mATH>.
+      !(isCustomComponentTag || type === type.toLowerCase()) ? warning$1(false, '<%s /> is using incorrect casing. ' + 'Use PascalCase for React components, ' + 'or lowercase for HTML elements.', type) : void 0;
+    }
+
+    if (type === 'script') {
+      // Create the script via .innerHTML so its "parser-inserted" flag is
+      // set to true and it does not execute
+      var div = ownerDocument.createElement('div');
+      div.innerHTML = '<script><' + '/script>'; // eslint-disable-line
+      // This is guaranteed to yield a script element.
+      var firstChild = div.firstChild;
+      domElement = div.removeChild(firstChild);
+    } else if (typeof props.is === 'string') {
+      // $FlowIssue `createElement` should be updated for Web Components
+      domElement = ownerDocument.createElement(type, { is: props.is });
+    } else {
+      // Separate else branch instead of using `props.is || undefined` above because of a Firefox bug.
+      // See discussion in https://github.com/facebook/react/pull/6896
+      // and discussion in https://bugzilla.mozilla.org/show_bug.cgi?id=1276240
+      domElement = ownerDocument.createElement(type);
+      // Normally attributes are assigned in `setInitialDOMProperties`, however the `multiple` and `size`
+      // attributes on `select`s needs to be added before `option`s are inserted.
+      // This prevents:
+      // - a bug where the `select` does not scroll to the correct option because singular
+      //  `select` elements automatically pick the first item #13222
+      // - a bug where the `select` set the first item as selected despite the `size` attribute #14239
+      // See https://github.com/facebook/react/issues/13222
+      // and https://github.com/facebook/react/issues/14239
+      if (type === 'select') {
+        var node = domElement;
+        if (props.multiple) {
+          node.multiple = true;
+        } else if (props.size) {
+          // Setting a size greater than 1 causes a select to behave like `multiple=true`, where
+          // it is possible that no option is selected.
+          //
+          // This is only necessary when a select in "single selection mode".
+          node.size = props.size;
+        }
+      }
+    }
+  } else {
+    domElement = ownerDocument.createElementNS(namespaceURI, type);
+  }
+
+  {
+    if (namespaceURI === HTML_NAMESPACE) {
+      if (!isCustomComponentTag && Object.prototype.toString.call(domElement) === '[object HTMLUnknownElement]' && !Object.prototype.hasOwnProperty.call(warnedUnknownTags, type)) {
+        warnedUnknownTags[type] = true;
+        warning$1(false, 'The tag <%s> is unrecognized in this browser. ' + 'If you meant to render a React component, start its name with ' + 'an uppercase letter.', type);
+      }
+    }
+  }
+
+  return domElement;
+}
+
+function createTextNode(text, rootContainerElement) {
+  return getOwnerDocumentFromRootContainer(rootContainerElement).createTextNode(text);
+}
+
+function setInitialProperties(domElement, tag, rawProps, rootContainerElement) {
+  var isCustomComponentTag = isCustomComponent(tag, rawProps);
+  {
+    validatePropertiesInDevelopment(tag, rawProps);
+    if (isCustomComponentTag && !didWarnShadyDOM && domElement.shadyRoot) {
+      warning$1(false, '%s is using shady DOM. Using shady DOM with React can ' + 'cause things to break subtly.', getCurrentFiberOwnerNameInDevOrNull() || 'A component');
+      didWarnShadyDOM = true;
+    }
+  }
+
+  // TODO: Make sure that we check isMounted before firing any of these events.
+  var props = void 0;
+  switch (tag) {
+    case 'iframe':
+    case 'object':
+      trapBubbledEvent(TOP_LOAD, domElement);
+      props = rawProps;
+      break;
+    case 'video':
+    case 'audio':
+      // Create listener for each media event
+      for (var i = 0; i < mediaEventTypes.length; i++) {
+        trapBubbledEvent(mediaEventTypes[i], domElement);
+      }
+      props = rawProps;
+      break;
+    case 'source':
+      trapBubbledEvent(TOP_ERROR, domElement);
+      props = rawProps;
+      break;
+    case 'img':
+    case 'image':
+    case 'link':
+      trapBubbledEvent(TOP_ERROR, domElement);
+      trapBubbledEvent(TOP_LOAD, domElement);
+      props = rawProps;
+      break;
+    case 'form':
+      trapBubbledEvent(TOP_RESET, domElement);
+      trapBubbledEvent(TOP_SUBMIT, domElement);
+      props = rawProps;
