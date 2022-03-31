@@ -30339,3 +30339,196 @@ function commitTextUpdate(textInstance, oldText, newText) {
 function appendChild(parentInstance, child) {
   parentInstance.appendChild(child);
 }
+
+function appendChildToContainer(container, child) {
+  var parentNode = void 0;
+  if (container.nodeType === COMMENT_NODE) {
+    parentNode = container.parentNode;
+    parentNode.insertBefore(child, container);
+  } else {
+    parentNode = container;
+    parentNode.appendChild(child);
+  }
+  // This container might be used for a portal.
+  // If something inside a portal is clicked, that click should bubble
+  // through the React tree. However, on Mobile Safari the click would
+  // never bubble through the *DOM* tree unless an ancestor with onclick
+  // event exists. So we wouldn't see it and dispatch it.
+  // This is why we ensure that non React root containers have inline onclick
+  // defined.
+  // https://github.com/facebook/react/issues/11918
+  var reactRootContainer = container._reactRootContainer;
+  if ((reactRootContainer === null || reactRootContainer === undefined) && parentNode.onclick === null) {
+    // TODO: This cast may not be sound for SVG, MathML or custom elements.
+    trapClickOnNonInteractiveElement(parentNode);
+  }
+}
+
+function insertBefore(parentInstance, child, beforeChild) {
+  parentInstance.insertBefore(child, beforeChild);
+}
+
+function insertInContainerBefore(container, child, beforeChild) {
+  if (container.nodeType === COMMENT_NODE) {
+    container.parentNode.insertBefore(child, beforeChild);
+  } else {
+    container.insertBefore(child, beforeChild);
+  }
+}
+
+function removeChild(parentInstance, child) {
+  parentInstance.removeChild(child);
+}
+
+function removeChildFromContainer(container, child) {
+  if (container.nodeType === COMMENT_NODE) {
+    container.parentNode.removeChild(child);
+  } else {
+    container.removeChild(child);
+  }
+}
+
+function clearSuspenseBoundary(parentInstance, suspenseInstance) {
+  var node = suspenseInstance;
+  // Delete all nodes within this suspense boundary.
+  // There might be nested nodes so we need to keep track of how
+  // deep we are and only break out when we're back on top.
+  var depth = 0;
+  do {
+    var nextNode = node.nextSibling;
+    parentInstance.removeChild(node);
+    if (nextNode && nextNode.nodeType === COMMENT_NODE) {
+      var data = nextNode.data;
+      if (data === SUSPENSE_END_DATA) {
+        if (depth === 0) {
+          parentInstance.removeChild(nextNode);
+          return;
+        } else {
+          depth--;
+        }
+      } else if (data === SUSPENSE_START_DATA) {
+        depth++;
+      }
+    }
+    node = nextNode;
+  } while (node);
+  // TODO: Warn, we didn't find the end comment boundary.
+}
+
+function clearSuspenseBoundaryFromContainer(container, suspenseInstance) {
+  if (container.nodeType === COMMENT_NODE) {
+    clearSuspenseBoundary(container.parentNode, suspenseInstance);
+  } else if (container.nodeType === ELEMENT_NODE) {
+    clearSuspenseBoundary(container, suspenseInstance);
+  } else {
+    // Document nodes should never contain suspense boundaries.
+  }
+}
+
+function hideInstance(instance) {
+  // TODO: Does this work for all element types? What about MathML? Should we
+  // pass host context to this method?
+  instance = instance;
+  instance.style.display = 'none';
+}
+
+function hideTextInstance(textInstance) {
+  textInstance.nodeValue = '';
+}
+
+function unhideInstance(instance, props) {
+  instance = instance;
+  var styleProp = props[STYLE];
+  var display = styleProp !== undefined && styleProp !== null && styleProp.hasOwnProperty('display') ? styleProp.display : null;
+  instance.style.display = dangerousStyleValue('display', display);
+}
+
+function unhideTextInstance(textInstance, text) {
+  textInstance.nodeValue = text;
+}
+
+// -------------------
+//     Hydration
+// -------------------
+
+var supportsHydration = true;
+
+function canHydrateInstance(instance, type, props) {
+  if (instance.nodeType !== ELEMENT_NODE || type.toLowerCase() !== instance.nodeName.toLowerCase()) {
+    return null;
+  }
+  // This has now been refined to an element node.
+  return instance;
+}
+
+function canHydrateTextInstance(instance, text) {
+  if (text === '' || instance.nodeType !== TEXT_NODE) {
+    // Empty strings are not parsed by HTML so there won't be a correct match here.
+    return null;
+  }
+  // This has now been refined to a text node.
+  return instance;
+}
+
+function canHydrateSuspenseInstance(instance) {
+  if (instance.nodeType !== COMMENT_NODE) {
+    // Empty strings are not parsed by HTML so there won't be a correct match here.
+    return null;
+  }
+  // This has now been refined to a suspense node.
+  return instance;
+}
+
+function getNextHydratableSibling(instance) {
+  var node = instance.nextSibling;
+  // Skip non-hydratable nodes.
+  while (node && node.nodeType !== ELEMENT_NODE && node.nodeType !== TEXT_NODE && (!enableSuspenseServerRenderer || node.nodeType !== COMMENT_NODE || node.data !== SUSPENSE_START_DATA)) {
+    node = node.nextSibling;
+  }
+  return node;
+}
+
+function getFirstHydratableChild(parentInstance) {
+  var next = parentInstance.firstChild;
+  // Skip non-hydratable nodes.
+  while (next && next.nodeType !== ELEMENT_NODE && next.nodeType !== TEXT_NODE && (!enableSuspenseServerRenderer || next.nodeType !== COMMENT_NODE || next.data !== SUSPENSE_START_DATA)) {
+    next = next.nextSibling;
+  }
+  return next;
+}
+
+function hydrateInstance(instance, type, props, rootContainerInstance, hostContext, internalInstanceHandle) {
+  precacheFiberNode(internalInstanceHandle, instance);
+  // TODO: Possibly defer this until the commit phase where all the events
+  // get attached.
+  updateFiberProps(instance, props);
+  var parentNamespace = void 0;
+  {
+    var hostContextDev = hostContext;
+    parentNamespace = hostContextDev.namespace;
+  }
+  return diffHydratedProperties(instance, type, props, parentNamespace, rootContainerInstance);
+}
+
+function hydrateTextInstance(textInstance, text, internalInstanceHandle) {
+  precacheFiberNode(internalInstanceHandle, textInstance);
+  return diffHydratedText(textInstance, text);
+}
+
+function getNextHydratableInstanceAfterSuspenseInstance(suspenseInstance) {
+  var node = suspenseInstance.nextSibling;
+  // Skip past all nodes within this suspense boundary.
+  // There might be nested nodes so we need to keep track of how
+  // deep we are and only break out when we're back on top.
+  var depth = 0;
+  while (node) {
+    if (node.nodeType === COMMENT_NODE) {
+      var data = node.data;
+      if (data === SUSPENSE_END_DATA) {
+        if (depth === 0) {
+          return getNextHydratableSibling(node);
+        } else {
+          depth--;
+        }
+      } else if (data === SUSPENSE_START_DATA) {
+        depth++;
