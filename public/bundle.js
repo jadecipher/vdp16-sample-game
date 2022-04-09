@@ -31854,3 +31854,195 @@ function assignFiberPropertiesInDEV(target, source) {
   target.effectTag = source.effectTag;
   target.nextEffect = source.nextEffect;
   target.firstEffect = source.firstEffect;
+  target.lastEffect = source.lastEffect;
+  target.expirationTime = source.expirationTime;
+  target.childExpirationTime = source.childExpirationTime;
+  target.alternate = source.alternate;
+  if (enableProfilerTimer) {
+    target.actualDuration = source.actualDuration;
+    target.actualStartTime = source.actualStartTime;
+    target.selfBaseDuration = source.selfBaseDuration;
+    target.treeBaseDuration = source.treeBaseDuration;
+  }
+  target._debugID = source._debugID;
+  target._debugSource = source._debugSource;
+  target._debugOwner = source._debugOwner;
+  target._debugIsCurrentlyTiming = source._debugIsCurrentlyTiming;
+  target._debugHookTypes = source._debugHookTypes;
+  return target;
+}
+
+// TODO: This should be lifted into the renderer.
+
+
+// The following attributes are only used by interaction tracing builds.
+// They enable interactions to be associated with their async work,
+// And expose interaction metadata to the React DevTools Profiler plugin.
+// Note that these attributes are only defined when the enableSchedulerTracing flag is enabled.
+
+
+// Exported FiberRoot type includes all properties,
+// To avoid requiring potentially error-prone :any casts throughout the project.
+// Profiling properties are only safe to access in profiling builds (when enableSchedulerTracing is true).
+// The types are defined separately within this file to ensure they stay in sync.
+// (We don't have to use an inline :any cast when enableSchedulerTracing is disabled.)
+
+
+function createFiberRoot(containerInfo, isConcurrent, hydrate) {
+  // Cyclic construction. This cheats the type system right now because
+  // stateNode is any.
+  var uninitializedFiber = createHostRootFiber(isConcurrent);
+
+  var root = void 0;
+  if (enableSchedulerTracing) {
+    root = {
+      current: uninitializedFiber,
+      containerInfo: containerInfo,
+      pendingChildren: null,
+
+      earliestPendingTime: NoWork,
+      latestPendingTime: NoWork,
+      earliestSuspendedTime: NoWork,
+      latestSuspendedTime: NoWork,
+      latestPingedTime: NoWork,
+
+      pingCache: null,
+
+      didError: false,
+
+      pendingCommitExpirationTime: NoWork,
+      finishedWork: null,
+      timeoutHandle: noTimeout,
+      context: null,
+      pendingContext: null,
+      hydrate: hydrate,
+      nextExpirationTimeToWorkOn: NoWork,
+      expirationTime: NoWork,
+      firstBatch: null,
+      nextScheduledRoot: null,
+
+      interactionThreadID: tracing.unstable_getThreadID(),
+      memoizedInteractions: new Set(),
+      pendingInteractionMap: new Map()
+    };
+  } else {
+    root = {
+      current: uninitializedFiber,
+      containerInfo: containerInfo,
+      pendingChildren: null,
+
+      pingCache: null,
+
+      earliestPendingTime: NoWork,
+      latestPendingTime: NoWork,
+      earliestSuspendedTime: NoWork,
+      latestSuspendedTime: NoWork,
+      latestPingedTime: NoWork,
+
+      didError: false,
+
+      pendingCommitExpirationTime: NoWork,
+      finishedWork: null,
+      timeoutHandle: noTimeout,
+      context: null,
+      pendingContext: null,
+      hydrate: hydrate,
+      nextExpirationTimeToWorkOn: NoWork,
+      expirationTime: NoWork,
+      firstBatch: null,
+      nextScheduledRoot: null
+    };
+  }
+
+  uninitializedFiber.stateNode = root;
+
+  // The reason for the way the Flow types are structured in this file,
+  // Is to avoid needing :any casts everywhere interaction tracing fields are used.
+  // Unfortunately that requires an :any cast for non-interaction tracing capable builds.
+  // $FlowFixMe Remove this :any cast and replace it with something better.
+  return root;
+}
+
+/**
+ * Forked from fbjs/warning:
+ * https://github.com/facebook/fbjs/blob/e66ba20ad5be433eb54423f2b097d829324d9de6/packages/fbjs/src/__forks__/warning.js
+ *
+ * Only change is we use console.warn instead of console.error,
+ * and do nothing when 'console' is not supported.
+ * This really simplifies the code.
+ * ---
+ * Similar to invariant but only logs a warning if the condition is not met.
+ * This can be used to log issues in development environments in critical
+ * paths. Removing the logging code for production environments will keep the
+ * same logic and follow the same code paths.
+ */
+
+var lowPriorityWarning = function () {};
+
+{
+  var printWarning = function (format) {
+    for (var _len = arguments.length, args = Array(_len > 1 ? _len - 1 : 0), _key = 1; _key < _len; _key++) {
+      args[_key - 1] = arguments[_key];
+    }
+
+    var argIndex = 0;
+    var message = 'Warning: ' + format.replace(/%s/g, function () {
+      return args[argIndex++];
+    });
+    if (typeof console !== 'undefined') {
+      console.warn(message);
+    }
+    try {
+      // --- Welcome to debugging React ---
+      // This error was thrown as a convenience so that you can use this stack
+      // to find the callsite that caused this warning to fire.
+      throw new Error(message);
+    } catch (x) {}
+  };
+
+  lowPriorityWarning = function (condition, format) {
+    if (format === undefined) {
+      throw new Error('`lowPriorityWarning(condition, format, ...args)` requires a warning ' + 'message argument');
+    }
+    if (!condition) {
+      for (var _len2 = arguments.length, args = Array(_len2 > 2 ? _len2 - 2 : 0), _key2 = 2; _key2 < _len2; _key2++) {
+        args[_key2 - 2] = arguments[_key2];
+      }
+
+      printWarning.apply(undefined, [format].concat(args));
+    }
+  };
+}
+
+var lowPriorityWarning$1 = lowPriorityWarning;
+
+var ReactStrictModeWarnings = {
+  discardPendingWarnings: function () {},
+  flushPendingDeprecationWarnings: function () {},
+  flushPendingUnsafeLifecycleWarnings: function () {},
+  recordDeprecationWarnings: function (fiber, instance) {},
+  recordUnsafeLifecycleWarnings: function (fiber, instance) {},
+  recordLegacyContextWarning: function (fiber, instance) {},
+  flushLegacyContextWarning: function () {}
+};
+
+{
+  var LIFECYCLE_SUGGESTIONS = {
+    UNSAFE_componentWillMount: 'componentDidMount',
+    UNSAFE_componentWillReceiveProps: 'static getDerivedStateFromProps',
+    UNSAFE_componentWillUpdate: 'componentDidUpdate'
+  };
+
+  var pendingComponentWillMountWarnings = [];
+  var pendingComponentWillReceivePropsWarnings = [];
+  var pendingComponentWillUpdateWarnings = [];
+  var pendingUnsafeLifecycleWarnings = new Map();
+  var pendingLegacyContextWarning = new Map();
+
+  // Tracks components we have already warned about.
+  var didWarnAboutDeprecatedLifecycles = new Set();
+  var didWarnAboutUnsafeLifecycles = new Set();
+  var didWarnAboutLegacyContext = new Set();
+
+  var setToSortedString = function (set) {
+    var array = [];
