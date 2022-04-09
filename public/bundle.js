@@ -32194,3 +32194,186 @@ var ReactStrictModeWarnings = {
       pendingUnsafeLifecycleWarnings.set(strictRoot, warningsForRoot);
     } else {
       warningsForRoot = pendingUnsafeLifecycleWarnings.get(strictRoot);
+    }
+
+    var unsafeLifecycles = [];
+    if (typeof instance.componentWillMount === 'function' && instance.componentWillMount.__suppressDeprecationWarning !== true || typeof instance.UNSAFE_componentWillMount === 'function') {
+      unsafeLifecycles.push('UNSAFE_componentWillMount');
+    }
+    if (typeof instance.componentWillReceiveProps === 'function' && instance.componentWillReceiveProps.__suppressDeprecationWarning !== true || typeof instance.UNSAFE_componentWillReceiveProps === 'function') {
+      unsafeLifecycles.push('UNSAFE_componentWillReceiveProps');
+    }
+    if (typeof instance.componentWillUpdate === 'function' && instance.componentWillUpdate.__suppressDeprecationWarning !== true || typeof instance.UNSAFE_componentWillUpdate === 'function') {
+      unsafeLifecycles.push('UNSAFE_componentWillUpdate');
+    }
+
+    if (unsafeLifecycles.length > 0) {
+      unsafeLifecycles.forEach(function (lifecycle) {
+        warningsForRoot[lifecycle].push(fiber);
+      });
+    }
+  };
+
+  ReactStrictModeWarnings.recordLegacyContextWarning = function (fiber, instance) {
+    var strictRoot = findStrictRoot(fiber);
+    if (strictRoot === null) {
+      warningWithoutStack$1(false, 'Expected to find a StrictMode component in a strict mode tree. ' + 'This error is likely caused by a bug in React. Please file an issue.');
+      return;
+    }
+
+    // Dedup strategy: Warn once per component.
+    if (didWarnAboutLegacyContext.has(fiber.type)) {
+      return;
+    }
+
+    var warningsForRoot = pendingLegacyContextWarning.get(strictRoot);
+
+    if (fiber.type.contextTypes != null || fiber.type.childContextTypes != null || instance !== null && typeof instance.getChildContext === 'function') {
+      if (warningsForRoot === undefined) {
+        warningsForRoot = [];
+        pendingLegacyContextWarning.set(strictRoot, warningsForRoot);
+      }
+      warningsForRoot.push(fiber);
+    }
+  };
+
+  ReactStrictModeWarnings.flushLegacyContextWarning = function () {
+    pendingLegacyContextWarning.forEach(function (fiberArray, strictRoot) {
+      var uniqueNames = new Set();
+      fiberArray.forEach(function (fiber) {
+        uniqueNames.add(getComponentName(fiber.type) || 'Component');
+        didWarnAboutLegacyContext.add(fiber.type);
+      });
+
+      var sortedNames = setToSortedString(uniqueNames);
+      var strictRootComponentStack = getStackByFiberInDevAndProd(strictRoot);
+
+      warningWithoutStack$1(false, 'Legacy context API has been detected within a strict-mode tree: %s' + '\n\nPlease update the following components: %s' + '\n\nLearn more about this warning here:' + '\nhttps://fb.me/react-strict-mode-warnings', strictRootComponentStack, sortedNames);
+    });
+  };
+}
+
+// This lets us hook into Fiber to debug what it's doing.
+// See https://github.com/facebook/react/pull/8033.
+// This is not part of the public API, not even for React DevTools.
+// You may only inject a debugTool if you work on React Fiber itself.
+var ReactFiberInstrumentation = {
+  debugTool: null
+};
+
+var ReactFiberInstrumentation_1 = ReactFiberInstrumentation;
+
+// TODO: Offscreen updates should never suspend. However, a promise that
+// suspended inside an offscreen subtree should be able to ping at the priority
+// of the outer render.
+
+function markPendingPriorityLevel(root, expirationTime) {
+  // If there's a gap between completing a failed root and retrying it,
+  // additional updates may be scheduled. Clear `didError`, in case the update
+  // is sufficient to fix the error.
+  root.didError = false;
+
+  // Update the latest and earliest pending times
+  var earliestPendingTime = root.earliestPendingTime;
+  if (earliestPendingTime === NoWork) {
+    // No other pending updates.
+    root.earliestPendingTime = root.latestPendingTime = expirationTime;
+  } else {
+    if (earliestPendingTime < expirationTime) {
+      // This is the earliest pending update.
+      root.earliestPendingTime = expirationTime;
+    } else {
+      var latestPendingTime = root.latestPendingTime;
+      if (latestPendingTime > expirationTime) {
+        // This is the latest pending update
+        root.latestPendingTime = expirationTime;
+      }
+    }
+  }
+  findNextExpirationTimeToWorkOn(expirationTime, root);
+}
+
+function markCommittedPriorityLevels(root, earliestRemainingTime) {
+  root.didError = false;
+
+  if (earliestRemainingTime === NoWork) {
+    // Fast path. There's no remaining work. Clear everything.
+    root.earliestPendingTime = NoWork;
+    root.latestPendingTime = NoWork;
+    root.earliestSuspendedTime = NoWork;
+    root.latestSuspendedTime = NoWork;
+    root.latestPingedTime = NoWork;
+    findNextExpirationTimeToWorkOn(NoWork, root);
+    return;
+  }
+
+  if (earliestRemainingTime < root.latestPingedTime) {
+    root.latestPingedTime = NoWork;
+  }
+
+  // Let's see if the previous latest known pending level was just flushed.
+  var latestPendingTime = root.latestPendingTime;
+  if (latestPendingTime !== NoWork) {
+    if (latestPendingTime > earliestRemainingTime) {
+      // We've flushed all the known pending levels.
+      root.earliestPendingTime = root.latestPendingTime = NoWork;
+    } else {
+      var earliestPendingTime = root.earliestPendingTime;
+      if (earliestPendingTime > earliestRemainingTime) {
+        // We've flushed the earliest known pending level. Set this to the
+        // latest pending time.
+        root.earliestPendingTime = root.latestPendingTime;
+      }
+    }
+  }
+
+  // Now let's handle the earliest remaining level in the whole tree. We need to
+  // decide whether to treat it as a pending level or as suspended. Check
+  // it falls within the range of known suspended levels.
+
+  var earliestSuspendedTime = root.earliestSuspendedTime;
+  if (earliestSuspendedTime === NoWork) {
+    // There's no suspended work. Treat the earliest remaining level as a
+    // pending level.
+    markPendingPriorityLevel(root, earliestRemainingTime);
+    findNextExpirationTimeToWorkOn(NoWork, root);
+    return;
+  }
+
+  var latestSuspendedTime = root.latestSuspendedTime;
+  if (earliestRemainingTime < latestSuspendedTime) {
+    // The earliest remaining level is later than all the suspended work. That
+    // means we've flushed all the suspended work.
+    root.earliestSuspendedTime = NoWork;
+    root.latestSuspendedTime = NoWork;
+    root.latestPingedTime = NoWork;
+
+    // There's no suspended work. Treat the earliest remaining level as a
+    // pending level.
+    markPendingPriorityLevel(root, earliestRemainingTime);
+    findNextExpirationTimeToWorkOn(NoWork, root);
+    return;
+  }
+
+  if (earliestRemainingTime > earliestSuspendedTime) {
+    // The earliest remaining time is earlier than all the suspended work.
+    // Treat it as a pending update.
+    markPendingPriorityLevel(root, earliestRemainingTime);
+    findNextExpirationTimeToWorkOn(NoWork, root);
+    return;
+  }
+
+  // The earliest remaining time falls within the range of known suspended
+  // levels. We should treat this as suspended work.
+  findNextExpirationTimeToWorkOn(NoWork, root);
+}
+
+function hasLowerPriorityWork(root, erroredExpirationTime) {
+  var latestPendingTime = root.latestPendingTime;
+  var latestSuspendedTime = root.latestSuspendedTime;
+  var latestPingedTime = root.latestPingedTime;
+  return latestPendingTime !== NoWork && latestPendingTime < erroredExpirationTime || latestSuspendedTime !== NoWork && latestSuspendedTime < erroredExpirationTime || latestPingedTime !== NoWork && latestPingedTime < erroredExpirationTime;
+}
+
+function isPriorityLevelSuspended(root, expirationTime) {
+  var earliestSuspendedTime = root.earliestSuspendedTime;
