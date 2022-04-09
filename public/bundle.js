@@ -32377,3 +32377,196 @@ function hasLowerPriorityWork(root, erroredExpirationTime) {
 
 function isPriorityLevelSuspended(root, expirationTime) {
   var earliestSuspendedTime = root.earliestSuspendedTime;
+  var latestSuspendedTime = root.latestSuspendedTime;
+  return earliestSuspendedTime !== NoWork && expirationTime <= earliestSuspendedTime && expirationTime >= latestSuspendedTime;
+}
+
+function markSuspendedPriorityLevel(root, suspendedTime) {
+  root.didError = false;
+  clearPing(root, suspendedTime);
+
+  // First, check the known pending levels and update them if needed.
+  var earliestPendingTime = root.earliestPendingTime;
+  var latestPendingTime = root.latestPendingTime;
+  if (earliestPendingTime === suspendedTime) {
+    if (latestPendingTime === suspendedTime) {
+      // Both known pending levels were suspended. Clear them.
+      root.earliestPendingTime = root.latestPendingTime = NoWork;
+    } else {
+      // The earliest pending level was suspended. Clear by setting it to the
+      // latest pending level.
+      root.earliestPendingTime = latestPendingTime;
+    }
+  } else if (latestPendingTime === suspendedTime) {
+    // The latest pending level was suspended. Clear by setting it to the
+    // latest pending level.
+    root.latestPendingTime = earliestPendingTime;
+  }
+
+  // Finally, update the known suspended levels.
+  var earliestSuspendedTime = root.earliestSuspendedTime;
+  var latestSuspendedTime = root.latestSuspendedTime;
+  if (earliestSuspendedTime === NoWork) {
+    // No other suspended levels.
+    root.earliestSuspendedTime = root.latestSuspendedTime = suspendedTime;
+  } else {
+    if (earliestSuspendedTime < suspendedTime) {
+      // This is the earliest suspended level.
+      root.earliestSuspendedTime = suspendedTime;
+    } else if (latestSuspendedTime > suspendedTime) {
+      // This is the latest suspended level
+      root.latestSuspendedTime = suspendedTime;
+    }
+  }
+
+  findNextExpirationTimeToWorkOn(suspendedTime, root);
+}
+
+function markPingedPriorityLevel(root, pingedTime) {
+  root.didError = false;
+
+  // TODO: When we add back resuming, we need to ensure the progressed work
+  // is thrown out and not reused during the restarted render. One way to
+  // invalidate the progressed work is to restart at expirationTime + 1.
+  var latestPingedTime = root.latestPingedTime;
+  if (latestPingedTime === NoWork || latestPingedTime > pingedTime) {
+    root.latestPingedTime = pingedTime;
+  }
+  findNextExpirationTimeToWorkOn(pingedTime, root);
+}
+
+function clearPing(root, completedTime) {
+  var latestPingedTime = root.latestPingedTime;
+  if (latestPingedTime >= completedTime) {
+    root.latestPingedTime = NoWork;
+  }
+}
+
+function findEarliestOutstandingPriorityLevel(root, renderExpirationTime) {
+  var earliestExpirationTime = renderExpirationTime;
+
+  var earliestPendingTime = root.earliestPendingTime;
+  var earliestSuspendedTime = root.earliestSuspendedTime;
+  if (earliestPendingTime > earliestExpirationTime) {
+    earliestExpirationTime = earliestPendingTime;
+  }
+  if (earliestSuspendedTime > earliestExpirationTime) {
+    earliestExpirationTime = earliestSuspendedTime;
+  }
+  return earliestExpirationTime;
+}
+
+function didExpireAtExpirationTime(root, currentTime) {
+  var expirationTime = root.expirationTime;
+  if (expirationTime !== NoWork && currentTime <= expirationTime) {
+    // The root has expired. Flush all work up to the current time.
+    root.nextExpirationTimeToWorkOn = currentTime;
+  }
+}
+
+function findNextExpirationTimeToWorkOn(completedExpirationTime, root) {
+  var earliestSuspendedTime = root.earliestSuspendedTime;
+  var latestSuspendedTime = root.latestSuspendedTime;
+  var earliestPendingTime = root.earliestPendingTime;
+  var latestPingedTime = root.latestPingedTime;
+
+  // Work on the earliest pending time. Failing that, work on the latest
+  // pinged time.
+  var nextExpirationTimeToWorkOn = earliestPendingTime !== NoWork ? earliestPendingTime : latestPingedTime;
+
+  // If there is no pending or pinged work, check if there's suspended work
+  // that's lower priority than what we just completed.
+  if (nextExpirationTimeToWorkOn === NoWork && (completedExpirationTime === NoWork || latestSuspendedTime < completedExpirationTime)) {
+    // The lowest priority suspended work is the work most likely to be
+    // committed next. Let's start rendering it again, so that if it times out,
+    // it's ready to commit.
+    nextExpirationTimeToWorkOn = latestSuspendedTime;
+  }
+
+  var expirationTime = nextExpirationTimeToWorkOn;
+  if (expirationTime !== NoWork && earliestSuspendedTime > expirationTime) {
+    // Expire using the earliest known expiration time.
+    expirationTime = earliestSuspendedTime;
+  }
+
+  root.nextExpirationTimeToWorkOn = nextExpirationTimeToWorkOn;
+  root.expirationTime = expirationTime;
+}
+
+function resolveDefaultProps(Component, baseProps) {
+  if (Component && Component.defaultProps) {
+    // Resolve default props. Taken from ReactElement
+    var props = _assign({}, baseProps);
+    var defaultProps = Component.defaultProps;
+    for (var propName in defaultProps) {
+      if (props[propName] === undefined) {
+        props[propName] = defaultProps[propName];
+      }
+    }
+    return props;
+  }
+  return baseProps;
+}
+
+function readLazyComponentType(lazyComponent) {
+  var status = lazyComponent._status;
+  var result = lazyComponent._result;
+  switch (status) {
+    case Resolved:
+      {
+        var Component = result;
+        return Component;
+      }
+    case Rejected:
+      {
+        var error = result;
+        throw error;
+      }
+    case Pending:
+      {
+        var thenable = result;
+        throw thenable;
+      }
+    default:
+      {
+        lazyComponent._status = Pending;
+        var ctor = lazyComponent._ctor;
+        var _thenable = ctor();
+        _thenable.then(function (moduleObject) {
+          if (lazyComponent._status === Pending) {
+            var defaultExport = moduleObject.default;
+            {
+              if (defaultExport === undefined) {
+                warning$1(false, 'lazy: Expected the result of a dynamic import() call. ' + 'Instead received: %s\n\nYour code should look like: \n  ' + "const MyComponent = lazy(() => import('./MyComponent'))", moduleObject);
+              }
+            }
+            lazyComponent._status = Resolved;
+            lazyComponent._result = defaultExport;
+          }
+        }, function (error) {
+          if (lazyComponent._status === Pending) {
+            lazyComponent._status = Rejected;
+            lazyComponent._result = error;
+          }
+        });
+        // Handle synchronous thenables.
+        switch (lazyComponent._status) {
+          case Resolved:
+            return lazyComponent._result;
+          case Rejected:
+            throw lazyComponent._result;
+        }
+        lazyComponent._result = _thenable;
+        throw _thenable;
+      }
+  }
+}
+
+var fakeInternalInstance = {};
+var isArray$1 = Array.isArray;
+
+// React.Component uses a shared frozen object by default.
+// We'll use it to determine whether we need to initialize legacy refs.
+var emptyRefsObject = new React.Component().refs;
+
+var didWarnAboutStateAssignmentForComponent = void 0;
