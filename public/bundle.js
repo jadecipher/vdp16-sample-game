@@ -34854,3 +34854,192 @@ function updateEffectImpl(fiberEffectTag, hookEffectTag, create, deps) {
   var destroy = undefined;
 
   if (currentHook !== null) {
+    var prevEffect = currentHook.memoizedState;
+    destroy = prevEffect.destroy;
+    if (nextDeps !== null) {
+      var prevDeps = prevEffect.deps;
+      if (areHookInputsEqual(nextDeps, prevDeps)) {
+        pushEffect(NoEffect$1, create, destroy, nextDeps);
+        return;
+      }
+    }
+  }
+
+  sideEffectTag |= fiberEffectTag;
+  hook.memoizedState = pushEffect(hookEffectTag, create, destroy, nextDeps);
+}
+
+function mountEffect(create, deps) {
+  return mountEffectImpl(Update | Passive, UnmountPassive | MountPassive, create, deps);
+}
+
+function updateEffect(create, deps) {
+  return updateEffectImpl(Update | Passive, UnmountPassive | MountPassive, create, deps);
+}
+
+function mountLayoutEffect(create, deps) {
+  return mountEffectImpl(Update, UnmountMutation | MountLayout, create, deps);
+}
+
+function updateLayoutEffect(create, deps) {
+  return updateEffectImpl(Update, UnmountMutation | MountLayout, create, deps);
+}
+
+function imperativeHandleEffect(create, ref) {
+  if (typeof ref === 'function') {
+    var refCallback = ref;
+    var _inst = create();
+    refCallback(_inst);
+    return function () {
+      refCallback(null);
+    };
+  } else if (ref !== null && ref !== undefined) {
+    var refObject = ref;
+    {
+      !refObject.hasOwnProperty('current') ? warning$1(false, 'Expected useImperativeHandle() first argument to either be a ' + 'ref callback or React.createRef() object. Instead received: %s.', 'an object with keys {' + Object.keys(refObject).join(', ') + '}') : void 0;
+    }
+    var _inst2 = create();
+    refObject.current = _inst2;
+    return function () {
+      refObject.current = null;
+    };
+  }
+}
+
+function mountImperativeHandle(ref, create, deps) {
+  {
+    !(typeof create === 'function') ? warning$1(false, 'Expected useImperativeHandle() second argument to be a function ' + 'that creates a handle. Instead received: %s.', create !== null ? typeof create : 'null') : void 0;
+  }
+
+  // TODO: If deps are provided, should we skip comparing the ref itself?
+  var effectDeps = deps !== null && deps !== undefined ? deps.concat([ref]) : null;
+
+  return mountEffectImpl(Update, UnmountMutation | MountLayout, imperativeHandleEffect.bind(null, create, ref), effectDeps);
+}
+
+function updateImperativeHandle(ref, create, deps) {
+  {
+    !(typeof create === 'function') ? warning$1(false, 'Expected useImperativeHandle() second argument to be a function ' + 'that creates a handle. Instead received: %s.', create !== null ? typeof create : 'null') : void 0;
+  }
+
+  // TODO: If deps are provided, should we skip comparing the ref itself?
+  var effectDeps = deps !== null && deps !== undefined ? deps.concat([ref]) : null;
+
+  return updateEffectImpl(Update, UnmountMutation | MountLayout, imperativeHandleEffect.bind(null, create, ref), effectDeps);
+}
+
+function mountDebugValue(value, formatterFn) {
+  // This hook is normally a no-op.
+  // The react-debug-hooks package injects its own implementation
+  // so that e.g. DevTools can display custom hook values.
+}
+
+var updateDebugValue = mountDebugValue;
+
+function mountCallback(callback, deps) {
+  var hook = mountWorkInProgressHook();
+  var nextDeps = deps === undefined ? null : deps;
+  hook.memoizedState = [callback, nextDeps];
+  return callback;
+}
+
+function updateCallback(callback, deps) {
+  var hook = updateWorkInProgressHook();
+  var nextDeps = deps === undefined ? null : deps;
+  var prevState = hook.memoizedState;
+  if (prevState !== null) {
+    if (nextDeps !== null) {
+      var prevDeps = prevState[1];
+      if (areHookInputsEqual(nextDeps, prevDeps)) {
+        return prevState[0];
+      }
+    }
+  }
+  hook.memoizedState = [callback, nextDeps];
+  return callback;
+}
+
+function mountMemo(nextCreate, deps) {
+  var hook = mountWorkInProgressHook();
+  var nextDeps = deps === undefined ? null : deps;
+  var nextValue = nextCreate();
+  hook.memoizedState = [nextValue, nextDeps];
+  return nextValue;
+}
+
+function updateMemo(nextCreate, deps) {
+  var hook = updateWorkInProgressHook();
+  var nextDeps = deps === undefined ? null : deps;
+  var prevState = hook.memoizedState;
+  if (prevState !== null) {
+    // Assume these are defined. If they're not, areHookInputsEqual will warn.
+    if (nextDeps !== null) {
+      var prevDeps = prevState[1];
+      if (areHookInputsEqual(nextDeps, prevDeps)) {
+        return prevState[0];
+      }
+    }
+  }
+  var nextValue = nextCreate();
+  hook.memoizedState = [nextValue, nextDeps];
+  return nextValue;
+}
+
+// in a test-like environment, we want to warn if dispatchAction()
+// is called outside of a batchedUpdates/TestUtils.act(...) call.
+var shouldWarnForUnbatchedSetState = false;
+
+{
+  // jest isn't a 'global', it's just exposed to tests via a wrapped function
+  // further, this isn't a test file, so flow doesn't recognize the symbol. So...
+  // $FlowExpectedError - because requirements don't give a damn about your type sigs.
+  if ('undefined' !== typeof jest) {
+    shouldWarnForUnbatchedSetState = true;
+  }
+}
+
+function dispatchAction(fiber, queue, action) {
+  !(numberOfReRenders < RE_RENDER_LIMIT) ? invariant(false, 'Too many re-renders. React limits the number of renders to prevent an infinite loop.') : void 0;
+
+  {
+    !(arguments.length <= 3) ? warning$1(false, "State updates from the useState() and useReducer() Hooks don't support the " + 'second callback argument. To execute a side effect after ' + 'rendering, declare it in the component body with useEffect().') : void 0;
+  }
+
+  var alternate = fiber.alternate;
+  if (fiber === currentlyRenderingFiber$1 || alternate !== null && alternate === currentlyRenderingFiber$1) {
+    // This is a render phase update. Stash it in a lazily-created map of
+    // queue -> linked list of updates. After this render pass, we'll restart
+    // and apply the stashed updates on top of the work-in-progress hook.
+    didScheduleRenderPhaseUpdate = true;
+    var update = {
+      expirationTime: renderExpirationTime,
+      action: action,
+      eagerReducer: null,
+      eagerState: null,
+      next: null
+    };
+    if (renderPhaseUpdates === null) {
+      renderPhaseUpdates = new Map();
+    }
+    var firstRenderPhaseUpdate = renderPhaseUpdates.get(queue);
+    if (firstRenderPhaseUpdate === undefined) {
+      renderPhaseUpdates.set(queue, update);
+    } else {
+      // Append the update to the end of the list.
+      var lastRenderPhaseUpdate = firstRenderPhaseUpdate;
+      while (lastRenderPhaseUpdate.next !== null) {
+        lastRenderPhaseUpdate = lastRenderPhaseUpdate.next;
+      }
+      lastRenderPhaseUpdate.next = update;
+    }
+  } else {
+    flushPassiveEffects();
+
+    var currentTime = requestCurrentTime();
+    var _expirationTime = computeExpirationForFiber(currentTime, fiber);
+
+    var _update2 = {
+      expirationTime: _expirationTime,
+      action: action,
+      eagerReducer: null,
+      eagerState: null,
