@@ -34667,3 +34667,190 @@ function updateReducer(reducer, initialArg, init) {
       if (firstRenderPhaseUpdate !== undefined) {
         renderPhaseUpdates.delete(queue);
         var newState = hook.memoizedState;
+        var update = firstRenderPhaseUpdate;
+        do {
+          // Process this render phase update. We don't have to check the
+          // priority because it will always be the same as the current
+          // render's.
+          var _action = update.action;
+          newState = reducer(newState, _action);
+          update = update.next;
+        } while (update !== null);
+
+        // Mark that the fiber performed work, but only if the new state is
+        // different from the current state.
+        if (!is(newState, hook.memoizedState)) {
+          markWorkInProgressReceivedUpdate();
+        }
+
+        hook.memoizedState = newState;
+        // Don't persist the state accumlated from the render phase updates to
+        // the base state unless the queue is empty.
+        // TODO: Not sure if this is the desired semantics, but it's what we
+        // do for gDSFP. I can't remember why.
+        if (hook.baseUpdate === queue.last) {
+          hook.baseState = newState;
+        }
+
+        queue.lastRenderedState = newState;
+
+        return [newState, _dispatch];
+      }
+    }
+    return [hook.memoizedState, _dispatch];
+  }
+
+  // The last update in the entire queue
+  var last = queue.last;
+  // The last update that is part of the base state.
+  var baseUpdate = hook.baseUpdate;
+  var baseState = hook.baseState;
+
+  // Find the first unprocessed update.
+  var first = void 0;
+  if (baseUpdate !== null) {
+    if (last !== null) {
+      // For the first update, the queue is a circular linked list where
+      // `queue.last.next = queue.first`. Once the first update commits, and
+      // the `baseUpdate` is no longer empty, we can unravel the list.
+      last.next = null;
+    }
+    first = baseUpdate.next;
+  } else {
+    first = last !== null ? last.next : null;
+  }
+  if (first !== null) {
+    var _newState = baseState;
+    var newBaseState = null;
+    var newBaseUpdate = null;
+    var prevUpdate = baseUpdate;
+    var _update = first;
+    var didSkip = false;
+    do {
+      var updateExpirationTime = _update.expirationTime;
+      if (updateExpirationTime < renderExpirationTime) {
+        // Priority is insufficient. Skip this update. If this is the first
+        // skipped update, the previous update/state is the new base
+        // update/state.
+        if (!didSkip) {
+          didSkip = true;
+          newBaseUpdate = prevUpdate;
+          newBaseState = _newState;
+        }
+        // Update the remaining priority in the queue.
+        if (updateExpirationTime > remainingExpirationTime) {
+          remainingExpirationTime = updateExpirationTime;
+        }
+      } else {
+        // Process this update.
+        if (_update.eagerReducer === reducer) {
+          // If this update was processed eagerly, and its reducer matches the
+          // current reducer, we can use the eagerly computed state.
+          _newState = _update.eagerState;
+        } else {
+          var _action2 = _update.action;
+          _newState = reducer(_newState, _action2);
+        }
+      }
+      prevUpdate = _update;
+      _update = _update.next;
+    } while (_update !== null && _update !== first);
+
+    if (!didSkip) {
+      newBaseUpdate = prevUpdate;
+      newBaseState = _newState;
+    }
+
+    // Mark that the fiber performed work, but only if the new state is
+    // different from the current state.
+    if (!is(_newState, hook.memoizedState)) {
+      markWorkInProgressReceivedUpdate();
+    }
+
+    hook.memoizedState = _newState;
+    hook.baseUpdate = newBaseUpdate;
+    hook.baseState = newBaseState;
+
+    queue.lastRenderedState = _newState;
+  }
+
+  var dispatch = queue.dispatch;
+  return [hook.memoizedState, dispatch];
+}
+
+function mountState(initialState) {
+  var hook = mountWorkInProgressHook();
+  if (typeof initialState === 'function') {
+    initialState = initialState();
+  }
+  hook.memoizedState = hook.baseState = initialState;
+  var queue = hook.queue = {
+    last: null,
+    dispatch: null,
+    lastRenderedReducer: basicStateReducer,
+    lastRenderedState: initialState
+  };
+  var dispatch = queue.dispatch = dispatchAction.bind(null,
+  // Flow doesn't know this is non-null, but we do.
+  currentlyRenderingFiber$1, queue);
+  return [hook.memoizedState, dispatch];
+}
+
+function updateState(initialState) {
+  return updateReducer(basicStateReducer, initialState);
+}
+
+function pushEffect(tag, create, destroy, deps) {
+  var effect = {
+    tag: tag,
+    create: create,
+    destroy: destroy,
+    deps: deps,
+    // Circular
+    next: null
+  };
+  if (componentUpdateQueue === null) {
+    componentUpdateQueue = createFunctionComponentUpdateQueue();
+    componentUpdateQueue.lastEffect = effect.next = effect;
+  } else {
+    var _lastEffect = componentUpdateQueue.lastEffect;
+    if (_lastEffect === null) {
+      componentUpdateQueue.lastEffect = effect.next = effect;
+    } else {
+      var firstEffect = _lastEffect.next;
+      _lastEffect.next = effect;
+      effect.next = firstEffect;
+      componentUpdateQueue.lastEffect = effect;
+    }
+  }
+  return effect;
+}
+
+function mountRef(initialValue) {
+  var hook = mountWorkInProgressHook();
+  var ref = { current: initialValue };
+  {
+    Object.seal(ref);
+  }
+  hook.memoizedState = ref;
+  return ref;
+}
+
+function updateRef(initialValue) {
+  var hook = updateWorkInProgressHook();
+  return hook.memoizedState;
+}
+
+function mountEffectImpl(fiberEffectTag, hookEffectTag, create, deps) {
+  var hook = mountWorkInProgressHook();
+  var nextDeps = deps === undefined ? null : deps;
+  sideEffectTag |= fiberEffectTag;
+  hook.memoizedState = pushEffect(hookEffectTag, create, undefined, nextDeps);
+}
+
+function updateEffectImpl(fiberEffectTag, hookEffectTag, create, deps) {
+  var hook = updateWorkInProgressHook();
+  var nextDeps = deps === undefined ? null : deps;
+  var destroy = undefined;
+
+  if (currentHook !== null) {
