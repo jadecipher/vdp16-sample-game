@@ -35430,3 +35430,175 @@ var InvalidNestedHooksDispatcherOnUpdateInDEV = null;
       var prevDispatcher = ReactCurrentDispatcher$1.current;
       ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnMountInDEV;
       try {
+        return mountState(initialState);
+      } finally {
+        ReactCurrentDispatcher$1.current = prevDispatcher;
+      }
+    },
+    useDebugValue: function (value, formatterFn) {
+      currentHookNameInDev = 'useDebugValue';
+      warnInvalidHookAccess();
+      mountHookTypesDev();
+      return mountDebugValue(value, formatterFn);
+    }
+  };
+
+  InvalidNestedHooksDispatcherOnUpdateInDEV = {
+    readContext: function (context, observedBits) {
+      warnInvalidContextAccess();
+      return readContext(context, observedBits);
+    },
+    useCallback: function (callback, deps) {
+      currentHookNameInDev = 'useCallback';
+      warnInvalidHookAccess();
+      updateHookTypesDev();
+      return updateCallback(callback, deps);
+    },
+    useContext: function (context, observedBits) {
+      currentHookNameInDev = 'useContext';
+      warnInvalidHookAccess();
+      updateHookTypesDev();
+      return readContext(context, observedBits);
+    },
+    useEffect: function (create, deps) {
+      currentHookNameInDev = 'useEffect';
+      warnInvalidHookAccess();
+      updateHookTypesDev();
+      return updateEffect(create, deps);
+    },
+    useImperativeHandle: function (ref, create, deps) {
+      currentHookNameInDev = 'useImperativeHandle';
+      warnInvalidHookAccess();
+      updateHookTypesDev();
+      return updateImperativeHandle(ref, create, deps);
+    },
+    useLayoutEffect: function (create, deps) {
+      currentHookNameInDev = 'useLayoutEffect';
+      warnInvalidHookAccess();
+      updateHookTypesDev();
+      return updateLayoutEffect(create, deps);
+    },
+    useMemo: function (create, deps) {
+      currentHookNameInDev = 'useMemo';
+      warnInvalidHookAccess();
+      updateHookTypesDev();
+      var prevDispatcher = ReactCurrentDispatcher$1.current;
+      ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
+      try {
+        return updateMemo(create, deps);
+      } finally {
+        ReactCurrentDispatcher$1.current = prevDispatcher;
+      }
+    },
+    useReducer: function (reducer, initialArg, init) {
+      currentHookNameInDev = 'useReducer';
+      warnInvalidHookAccess();
+      updateHookTypesDev();
+      var prevDispatcher = ReactCurrentDispatcher$1.current;
+      ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
+      try {
+        return updateReducer(reducer, initialArg, init);
+      } finally {
+        ReactCurrentDispatcher$1.current = prevDispatcher;
+      }
+    },
+    useRef: function (initialValue) {
+      currentHookNameInDev = 'useRef';
+      warnInvalidHookAccess();
+      updateHookTypesDev();
+      return updateRef(initialValue);
+    },
+    useState: function (initialState) {
+      currentHookNameInDev = 'useState';
+      warnInvalidHookAccess();
+      updateHookTypesDev();
+      var prevDispatcher = ReactCurrentDispatcher$1.current;
+      ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
+      try {
+        return updateState(initialState);
+      } finally {
+        ReactCurrentDispatcher$1.current = prevDispatcher;
+      }
+    },
+    useDebugValue: function (value, formatterFn) {
+      currentHookNameInDev = 'useDebugValue';
+      warnInvalidHookAccess();
+      updateHookTypesDev();
+      return updateDebugValue(value, formatterFn);
+    }
+  };
+}
+
+var commitTime = 0;
+var profilerStartTime = -1;
+
+function getCommitTime() {
+  return commitTime;
+}
+
+function recordCommitTime() {
+  if (!enableProfilerTimer) {
+    return;
+  }
+  commitTime = scheduler.unstable_now();
+}
+
+function startProfilerTimer(fiber) {
+  if (!enableProfilerTimer) {
+    return;
+  }
+
+  profilerStartTime = scheduler.unstable_now();
+
+  if (fiber.actualStartTime < 0) {
+    fiber.actualStartTime = scheduler.unstable_now();
+  }
+}
+
+function stopProfilerTimerIfRunning(fiber) {
+  if (!enableProfilerTimer) {
+    return;
+  }
+  profilerStartTime = -1;
+}
+
+function stopProfilerTimerIfRunningAndRecordDelta(fiber, overrideBaseTime) {
+  if (!enableProfilerTimer) {
+    return;
+  }
+
+  if (profilerStartTime >= 0) {
+    var elapsedTime = scheduler.unstable_now() - profilerStartTime;
+    fiber.actualDuration += elapsedTime;
+    if (overrideBaseTime) {
+      fiber.selfBaseDuration = elapsedTime;
+    }
+    profilerStartTime = -1;
+  }
+}
+
+// The deepest Fiber on the stack involved in a hydration context.
+// This may have been an insertion or a hydration.
+var hydrationParentFiber = null;
+var nextHydratableInstance = null;
+var isHydrating = false;
+
+function enterHydrationState(fiber) {
+  if (!supportsHydration) {
+    return false;
+  }
+
+  var parentInstance = fiber.stateNode.containerInfo;
+  nextHydratableInstance = getFirstHydratableChild(parentInstance);
+  hydrationParentFiber = fiber;
+  isHydrating = true;
+  return true;
+}
+
+function reenterHydrationStateFromDehydratedSuspenseInstance(fiber) {
+  if (!supportsHydration) {
+    return false;
+  }
+
+  var suspenseInstance = fiber.stateNode;
+  nextHydratableInstance = getNextHydratableSibling(suspenseInstance);
