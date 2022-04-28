@@ -36344,3 +36344,192 @@ function updateHostComponent(current$$1, workInProgress, renderExpirationTime) {
 
   var nextChildren = nextProps.children;
   var isDirectTextChild = shouldSetTextContent(type, nextProps);
+
+  if (isDirectTextChild) {
+    // We special case a direct text child of a host node. This is a common
+    // case. We won't handle it as a reified child. We will instead handle
+    // this in the host environment that also have access to this prop. That
+    // avoids allocating another HostText fiber and traversing it.
+    nextChildren = null;
+  } else if (prevProps !== null && shouldSetTextContent(type, prevProps)) {
+    // If we're switching from a direct text child to a normal child, or to
+    // empty, we need to schedule the text content to be reset.
+    workInProgress.effectTag |= ContentReset;
+  }
+
+  markRef(current$$1, workInProgress);
+
+  // Check the host config to see if the children are offscreen/hidden.
+  if (renderExpirationTime !== Never && workInProgress.mode & ConcurrentMode && shouldDeprioritizeSubtree(type, nextProps)) {
+    // Schedule this fiber to re-render at offscreen priority. Then bailout.
+    workInProgress.expirationTime = workInProgress.childExpirationTime = Never;
+    return null;
+  }
+
+  reconcileChildren(current$$1, workInProgress, nextChildren, renderExpirationTime);
+  return workInProgress.child;
+}
+
+function updateHostText(current$$1, workInProgress) {
+  if (current$$1 === null) {
+    tryToClaimNextHydratableInstance(workInProgress);
+  }
+  // Nothing to do here. This is terminal. We'll do the completion step
+  // immediately after.
+  return null;
+}
+
+function mountLazyComponent(_current, workInProgress, elementType, updateExpirationTime, renderExpirationTime) {
+  if (_current !== null) {
+    // An lazy component only mounts if it suspended inside a non-
+    // concurrent tree, in an inconsistent state. We want to treat it like
+    // a new mount, even though an empty version of it already committed.
+    // Disconnect the alternate pointers.
+    _current.alternate = null;
+    workInProgress.alternate = null;
+    // Since this is conceptually a new fiber, schedule a Placement effect
+    workInProgress.effectTag |= Placement;
+  }
+
+  var props = workInProgress.pendingProps;
+  // We can't start a User Timing measurement with correct label yet.
+  // Cancel and resume right after we know the tag.
+  cancelWorkTimer(workInProgress);
+  var Component = readLazyComponentType(elementType);
+  // Store the unwrapped component in the type.
+  workInProgress.type = Component;
+  var resolvedTag = workInProgress.tag = resolveLazyComponentTag(Component);
+  startWorkTimer(workInProgress);
+  var resolvedProps = resolveDefaultProps(Component, props);
+  var child = void 0;
+  switch (resolvedTag) {
+    case FunctionComponent:
+      {
+        {
+          validateFunctionComponentInDev(workInProgress, Component);
+        }
+        child = updateFunctionComponent(null, workInProgress, Component, resolvedProps, renderExpirationTime);
+        break;
+      }
+    case ClassComponent:
+      {
+        child = updateClassComponent(null, workInProgress, Component, resolvedProps, renderExpirationTime);
+        break;
+      }
+    case ForwardRef:
+      {
+        child = updateForwardRef(null, workInProgress, Component, resolvedProps, renderExpirationTime);
+        break;
+      }
+    case MemoComponent:
+      {
+        {
+          if (workInProgress.type !== workInProgress.elementType) {
+            var outerPropTypes = Component.propTypes;
+            if (outerPropTypes) {
+              checkPropTypes(outerPropTypes, resolvedProps, // Resolved for outer only
+              'prop', getComponentName(Component), getCurrentFiberStackInDev);
+            }
+          }
+        }
+        child = updateMemoComponent(null, workInProgress, Component, resolveDefaultProps(Component.type, resolvedProps), // The inner type can have defaults too
+        updateExpirationTime, renderExpirationTime);
+        break;
+      }
+    default:
+      {
+        var hint = '';
+        {
+          if (Component !== null && typeof Component === 'object' && Component.$$typeof === REACT_LAZY_TYPE) {
+            hint = ' Did you wrap a component in React.lazy() more than once?';
+          }
+        }
+        // This message intentionally doesn't mention ForwardRef or MemoComponent
+        // because the fact that it's a separate type of work is an
+        // implementation detail.
+        invariant(false, 'Element type is invalid. Received a promise that resolves to: %s. Lazy element type must resolve to a class or function.%s', Component, hint);
+      }
+  }
+  return child;
+}
+
+function mountIncompleteClassComponent(_current, workInProgress, Component, nextProps, renderExpirationTime) {
+  if (_current !== null) {
+    // An incomplete component only mounts if it suspended inside a non-
+    // concurrent tree, in an inconsistent state. We want to treat it like
+    // a new mount, even though an empty version of it already committed.
+    // Disconnect the alternate pointers.
+    _current.alternate = null;
+    workInProgress.alternate = null;
+    // Since this is conceptually a new fiber, schedule a Placement effect
+    workInProgress.effectTag |= Placement;
+  }
+
+  // Promote the fiber to a class and try rendering again.
+  workInProgress.tag = ClassComponent;
+
+  // The rest of this function is a fork of `updateClassComponent`
+
+  // Push context providers early to prevent context stack mismatches.
+  // During mounting we don't know the child context yet as the instance doesn't exist.
+  // We will invalidate the child context in finishClassComponent() right after rendering.
+  var hasContext = void 0;
+  if (isContextProvider(Component)) {
+    hasContext = true;
+    pushContextProvider(workInProgress);
+  } else {
+    hasContext = false;
+  }
+  prepareToReadContext(workInProgress, renderExpirationTime);
+
+  constructClassInstance(workInProgress, Component, nextProps, renderExpirationTime);
+  mountClassInstance(workInProgress, Component, nextProps, renderExpirationTime);
+
+  return finishClassComponent(null, workInProgress, Component, true, hasContext, renderExpirationTime);
+}
+
+function mountIndeterminateComponent(_current, workInProgress, Component, renderExpirationTime) {
+  if (_current !== null) {
+    // An indeterminate component only mounts if it suspended inside a non-
+    // concurrent tree, in an inconsistent state. We want to treat it like
+    // a new mount, even though an empty version of it already committed.
+    // Disconnect the alternate pointers.
+    _current.alternate = null;
+    workInProgress.alternate = null;
+    // Since this is conceptually a new fiber, schedule a Placement effect
+    workInProgress.effectTag |= Placement;
+  }
+
+  var props = workInProgress.pendingProps;
+  var unmaskedContext = getUnmaskedContext(workInProgress, Component, false);
+  var context = getMaskedContext(workInProgress, unmaskedContext);
+
+  prepareToReadContext(workInProgress, renderExpirationTime);
+
+  var value = void 0;
+
+  {
+    if (Component.prototype && typeof Component.prototype.render === 'function') {
+      var componentName = getComponentName(Component) || 'Unknown';
+
+      if (!didWarnAboutBadClass[componentName]) {
+        warningWithoutStack$1(false, "The <%s /> component appears to have a render method, but doesn't extend React.Component. " + 'This is likely to cause errors. Change %s to extend React.Component instead.', componentName, componentName);
+        didWarnAboutBadClass[componentName] = true;
+      }
+    }
+
+    if (workInProgress.mode & StrictMode) {
+      ReactStrictModeWarnings.recordLegacyContextWarning(workInProgress, null);
+    }
+
+    ReactCurrentOwner$3.current = workInProgress;
+    value = renderWithHooks(null, workInProgress, Component, props, context, renderExpirationTime);
+  }
+  // React DevTools reads this flag.
+  workInProgress.effectTag |= PerformedWork;
+
+  if (typeof value === 'object' && value !== null && typeof value.render === 'function' && value.$$typeof === undefined) {
+    // Proceed under the assumption that this is a class instance
+    workInProgress.tag = ClassComponent;
+
+    // Throw out any hooks that were used.
