@@ -38981,3 +38981,224 @@ function hideOrUnhideAllChildren(finishedWork, isHidden) {
       }
       node.sibling.return = node.return;
       node = node.sibling;
+    }
+  }
+}
+
+function commitAttachRef(finishedWork) {
+  var ref = finishedWork.ref;
+  if (ref !== null) {
+    var instance = finishedWork.stateNode;
+    var instanceToUse = void 0;
+    switch (finishedWork.tag) {
+      case HostComponent:
+        instanceToUse = getPublicInstance(instance);
+        break;
+      default:
+        instanceToUse = instance;
+    }
+    if (typeof ref === 'function') {
+      ref(instanceToUse);
+    } else {
+      {
+        if (!ref.hasOwnProperty('current')) {
+          warningWithoutStack$1(false, 'Unexpected ref object provided for %s. ' + 'Use either a ref-setter function or React.createRef().%s', getComponentName(finishedWork.type), getStackByFiberInDevAndProd(finishedWork));
+        }
+      }
+
+      ref.current = instanceToUse;
+    }
+  }
+}
+
+function commitDetachRef(current$$1) {
+  var currentRef = current$$1.ref;
+  if (currentRef !== null) {
+    if (typeof currentRef === 'function') {
+      currentRef(null);
+    } else {
+      currentRef.current = null;
+    }
+  }
+}
+
+// User-originating errors (lifecycles and refs) should not interrupt
+// deletion, so don't let them throw. Host-originating errors should
+// interrupt deletion, so it's okay
+function commitUnmount(current$$1) {
+  onCommitUnmount(current$$1);
+
+  switch (current$$1.tag) {
+    case FunctionComponent:
+    case ForwardRef:
+    case MemoComponent:
+    case SimpleMemoComponent:
+      {
+        var updateQueue = current$$1.updateQueue;
+        if (updateQueue !== null) {
+          var lastEffect = updateQueue.lastEffect;
+          if (lastEffect !== null) {
+            var firstEffect = lastEffect.next;
+            var effect = firstEffect;
+            do {
+              var destroy = effect.destroy;
+              if (destroy !== undefined) {
+                safelyCallDestroy(current$$1, destroy);
+              }
+              effect = effect.next;
+            } while (effect !== firstEffect);
+          }
+        }
+        break;
+      }
+    case ClassComponent:
+      {
+        safelyDetachRef(current$$1);
+        var instance = current$$1.stateNode;
+        if (typeof instance.componentWillUnmount === 'function') {
+          safelyCallComponentWillUnmount(current$$1, instance);
+        }
+        return;
+      }
+    case HostComponent:
+      {
+        safelyDetachRef(current$$1);
+        return;
+      }
+    case HostPortal:
+      {
+        // TODO: this is recursive.
+        // We are also not using this parent because
+        // the portal will get pushed immediately.
+        if (supportsMutation) {
+          unmountHostComponents(current$$1);
+        } else if (supportsPersistence) {
+          emptyPortalContainer(current$$1);
+        }
+        return;
+      }
+  }
+}
+
+function commitNestedUnmounts(root) {
+  // While we're inside a removed host node we don't want to call
+  // removeChild on the inner nodes because they're removed by the top
+  // call anyway. We also want to call componentWillUnmount on all
+  // composites before this host node is removed from the tree. Therefore
+  var node = root;
+  while (true) {
+    commitUnmount(node);
+    // Visit children because they may contain more composite or host nodes.
+    // Skip portals because commitUnmount() currently visits them recursively.
+    if (node.child !== null && (
+    // If we use mutation we drill down into portals using commitUnmount above.
+    // If we don't use mutation we drill down into portals here instead.
+    !supportsMutation || node.tag !== HostPortal)) {
+      node.child.return = node;
+      node = node.child;
+      continue;
+    }
+    if (node === root) {
+      return;
+    }
+    while (node.sibling === null) {
+      if (node.return === null || node.return === root) {
+        return;
+      }
+      node = node.return;
+    }
+    node.sibling.return = node.return;
+    node = node.sibling;
+  }
+}
+
+function detachFiber(current$$1) {
+  // Cut off the return pointers to disconnect it from the tree. Ideally, we
+  // should clear the child pointer of the parent alternate to let this
+  // get GC:ed but we don't know which for sure which parent is the current
+  // one so we'll settle for GC:ing the subtree of this child. This child
+  // itself will be GC:ed when the parent updates the next time.
+  current$$1.return = null;
+  current$$1.child = null;
+  current$$1.memoizedState = null;
+  current$$1.updateQueue = null;
+  var alternate = current$$1.alternate;
+  if (alternate !== null) {
+    alternate.return = null;
+    alternate.child = null;
+    alternate.memoizedState = null;
+    alternate.updateQueue = null;
+  }
+}
+
+function emptyPortalContainer(current$$1) {
+  if (!supportsPersistence) {
+    return;
+  }
+
+  var portal = current$$1.stateNode;
+  var containerInfo = portal.containerInfo;
+
+  var emptyChildSet = createContainerChildSet(containerInfo);
+  replaceContainerChildren(containerInfo, emptyChildSet);
+}
+
+function commitContainer(finishedWork) {
+  if (!supportsPersistence) {
+    return;
+  }
+
+  switch (finishedWork.tag) {
+    case ClassComponent:
+      {
+        return;
+      }
+    case HostComponent:
+      {
+        return;
+      }
+    case HostText:
+      {
+        return;
+      }
+    case HostRoot:
+    case HostPortal:
+      {
+        var portalOrRoot = finishedWork.stateNode;
+        var containerInfo = portalOrRoot.containerInfo,
+            _pendingChildren = portalOrRoot.pendingChildren;
+
+        replaceContainerChildren(containerInfo, _pendingChildren);
+        return;
+      }
+    default:
+      {
+        invariant(false, 'This unit of work tag should not have side-effects. This error is likely caused by a bug in React. Please file an issue.');
+      }
+  }
+}
+
+function getHostParentFiber(fiber) {
+  var parent = fiber.return;
+  while (parent !== null) {
+    if (isHostParent(parent)) {
+      return parent;
+    }
+    parent = parent.return;
+  }
+  invariant(false, 'Expected to find a host parent. This error is likely caused by a bug in React. Please file an issue.');
+}
+
+function isHostParent(fiber) {
+  return fiber.tag === HostComponent || fiber.tag === HostRoot || fiber.tag === HostPortal;
+}
+
+function getHostSibling(fiber) {
+  // We're going to search forward into the tree until we find a sibling host
+  // node. Unfortunately, if multiple insertions are done in a row we have to
+  // search past them. This leads to exponential search for the next sibling.
+  var node = fiber;
+  siblings: while (true) {
+    // If we didn't find anything, let's try the next sibling.
+    while (node.sibling === null) {
+      if (node.return === null || isHostParent(node.return)) {
