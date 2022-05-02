@@ -39202,3 +39202,186 @@ function getHostSibling(fiber) {
     // If we didn't find anything, let's try the next sibling.
     while (node.sibling === null) {
       if (node.return === null || isHostParent(node.return)) {
+        // If we pop out of the root or hit the parent the fiber we are the
+        // last sibling.
+        return null;
+      }
+      node = node.return;
+    }
+    node.sibling.return = node.return;
+    node = node.sibling;
+    while (node.tag !== HostComponent && node.tag !== HostText && node.tag !== DehydratedSuspenseComponent) {
+      // If it is not host node and, we might have a host node inside it.
+      // Try to search down until we find one.
+      if (node.effectTag & Placement) {
+        // If we don't have a child, try the siblings instead.
+        continue siblings;
+      }
+      // If we don't have a child, try the siblings instead.
+      // We also skip portals because they are not part of this host tree.
+      if (node.child === null || node.tag === HostPortal) {
+        continue siblings;
+      } else {
+        node.child.return = node;
+        node = node.child;
+      }
+    }
+    // Check if this host node is stable or about to be placed.
+    if (!(node.effectTag & Placement)) {
+      // Found it!
+      return node.stateNode;
+    }
+  }
+}
+
+function commitPlacement(finishedWork) {
+  if (!supportsMutation) {
+    return;
+  }
+
+  // Recursively insert all host nodes into the parent.
+  var parentFiber = getHostParentFiber(finishedWork);
+
+  // Note: these two variables *must* always be updated together.
+  var parent = void 0;
+  var isContainer = void 0;
+
+  switch (parentFiber.tag) {
+    case HostComponent:
+      parent = parentFiber.stateNode;
+      isContainer = false;
+      break;
+    case HostRoot:
+      parent = parentFiber.stateNode.containerInfo;
+      isContainer = true;
+      break;
+    case HostPortal:
+      parent = parentFiber.stateNode.containerInfo;
+      isContainer = true;
+      break;
+    default:
+      invariant(false, 'Invalid host parent fiber. This error is likely caused by a bug in React. Please file an issue.');
+  }
+  if (parentFiber.effectTag & ContentReset) {
+    // Reset the text content of the parent before doing any insertions
+    resetTextContent(parent);
+    // Clear ContentReset from the effect tag
+    parentFiber.effectTag &= ~ContentReset;
+  }
+
+  var before = getHostSibling(finishedWork);
+  // We only have the top Fiber that was inserted but we need to recurse down its
+  // children to find all the terminal nodes.
+  var node = finishedWork;
+  while (true) {
+    if (node.tag === HostComponent || node.tag === HostText) {
+      if (before) {
+        if (isContainer) {
+          insertInContainerBefore(parent, node.stateNode, before);
+        } else {
+          insertBefore(parent, node.stateNode, before);
+        }
+      } else {
+        if (isContainer) {
+          appendChildToContainer(parent, node.stateNode);
+        } else {
+          appendChild(parent, node.stateNode);
+        }
+      }
+    } else if (node.tag === HostPortal) {
+      // If the insertion itself is a portal, then we don't want to traverse
+      // down its children. Instead, we'll get insertions from each child in
+      // the portal directly.
+    } else if (node.child !== null) {
+      node.child.return = node;
+      node = node.child;
+      continue;
+    }
+    if (node === finishedWork) {
+      return;
+    }
+    while (node.sibling === null) {
+      if (node.return === null || node.return === finishedWork) {
+        return;
+      }
+      node = node.return;
+    }
+    node.sibling.return = node.return;
+    node = node.sibling;
+  }
+}
+
+function unmountHostComponents(current$$1) {
+  // We only have the top Fiber that was deleted but we need to recurse down its
+  var node = current$$1;
+
+  // Each iteration, currentParent is populated with node's host parent if not
+  // currentParentIsValid.
+  var currentParentIsValid = false;
+
+  // Note: these two variables *must* always be updated together.
+  var currentParent = void 0;
+  var currentParentIsContainer = void 0;
+
+  while (true) {
+    if (!currentParentIsValid) {
+      var parent = node.return;
+      findParent: while (true) {
+        !(parent !== null) ? invariant(false, 'Expected to find a host parent. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+        switch (parent.tag) {
+          case HostComponent:
+            currentParent = parent.stateNode;
+            currentParentIsContainer = false;
+            break findParent;
+          case HostRoot:
+            currentParent = parent.stateNode.containerInfo;
+            currentParentIsContainer = true;
+            break findParent;
+          case HostPortal:
+            currentParent = parent.stateNode.containerInfo;
+            currentParentIsContainer = true;
+            break findParent;
+        }
+        parent = parent.return;
+      }
+      currentParentIsValid = true;
+    }
+
+    if (node.tag === HostComponent || node.tag === HostText) {
+      commitNestedUnmounts(node);
+      // After all the children have unmounted, it is now safe to remove the
+      // node from the tree.
+      if (currentParentIsContainer) {
+        removeChildFromContainer(currentParent, node.stateNode);
+      } else {
+        removeChild(currentParent, node.stateNode);
+      }
+      // Don't visit children because we already visited them.
+    } else if (enableSuspenseServerRenderer && node.tag === DehydratedSuspenseComponent) {
+      // Delete the dehydrated suspense boundary and all of its content.
+      if (currentParentIsContainer) {
+        clearSuspenseBoundaryFromContainer(currentParent, node.stateNode);
+      } else {
+        clearSuspenseBoundary(currentParent, node.stateNode);
+      }
+    } else if (node.tag === HostPortal) {
+      if (node.child !== null) {
+        // When we go into a portal, it becomes the parent to remove from.
+        // We will reassign it back when we pop the portal on the way up.
+        currentParent = node.stateNode.containerInfo;
+        currentParentIsContainer = true;
+        // Visit children because portals might contain host components.
+        node.child.return = node;
+        node = node.child;
+        continue;
+      }
+    } else {
+      commitUnmount(node);
+      // Visit children because we may find more host components below.
+      if (node.child !== null) {
+        node.child.return = node;
+        node = node.child;
+        continue;
+      }
+    }
+    if (node === current$$1) {
