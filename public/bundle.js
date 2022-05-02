@@ -39385,3 +39385,197 @@ function unmountHostComponents(current$$1) {
       }
     }
     if (node === current$$1) {
+      return;
+    }
+    while (node.sibling === null) {
+      if (node.return === null || node.return === current$$1) {
+        return;
+      }
+      node = node.return;
+      if (node.tag === HostPortal) {
+        // When we go out of the portal, we need to restore the parent.
+        // Since we don't keep a stack of them, we will search for it.
+        currentParentIsValid = false;
+      }
+    }
+    node.sibling.return = node.return;
+    node = node.sibling;
+  }
+}
+
+function commitDeletion(current$$1) {
+  if (supportsMutation) {
+    // Recursively delete all host nodes from the parent.
+    // Detach refs and call componentWillUnmount() on the whole subtree.
+    unmountHostComponents(current$$1);
+  } else {
+    // Detach refs and call componentWillUnmount() on the whole subtree.
+    commitNestedUnmounts(current$$1);
+  }
+  detachFiber(current$$1);
+}
+
+function commitWork(current$$1, finishedWork) {
+  if (!supportsMutation) {
+    switch (finishedWork.tag) {
+      case FunctionComponent:
+      case ForwardRef:
+      case MemoComponent:
+      case SimpleMemoComponent:
+        {
+          // Note: We currently never use MountMutation, but useLayout uses
+          // UnmountMutation.
+          commitHookEffectList(UnmountMutation, MountMutation, finishedWork);
+          return;
+        }
+    }
+
+    commitContainer(finishedWork);
+    return;
+  }
+
+  switch (finishedWork.tag) {
+    case FunctionComponent:
+    case ForwardRef:
+    case MemoComponent:
+    case SimpleMemoComponent:
+      {
+        // Note: We currently never use MountMutation, but useLayout uses
+        // UnmountMutation.
+        commitHookEffectList(UnmountMutation, MountMutation, finishedWork);
+        return;
+      }
+    case ClassComponent:
+      {
+        return;
+      }
+    case HostComponent:
+      {
+        var instance = finishedWork.stateNode;
+        if (instance != null) {
+          // Commit the work prepared earlier.
+          var newProps = finishedWork.memoizedProps;
+          // For hydration we reuse the update path but we treat the oldProps
+          // as the newProps. The updatePayload will contain the real change in
+          // this case.
+          var oldProps = current$$1 !== null ? current$$1.memoizedProps : newProps;
+          var type = finishedWork.type;
+          // TODO: Type the updateQueue to be specific to host components.
+          var updatePayload = finishedWork.updateQueue;
+          finishedWork.updateQueue = null;
+          if (updatePayload !== null) {
+            commitUpdate(instance, updatePayload, type, oldProps, newProps, finishedWork);
+          }
+        }
+        return;
+      }
+    case HostText:
+      {
+        !(finishedWork.stateNode !== null) ? invariant(false, 'This should have a text node initialized. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+        var textInstance = finishedWork.stateNode;
+        var newText = finishedWork.memoizedProps;
+        // For hydration we reuse the update path but we treat the oldProps
+        // as the newProps. The updatePayload will contain the real change in
+        // this case.
+        var oldText = current$$1 !== null ? current$$1.memoizedProps : newText;
+        commitTextUpdate(textInstance, oldText, newText);
+        return;
+      }
+    case HostRoot:
+      {
+        return;
+      }
+    case Profiler:
+      {
+        return;
+      }
+    case SuspenseComponent:
+      {
+        var newState = finishedWork.memoizedState;
+
+        var newDidTimeout = void 0;
+        var primaryChildParent = finishedWork;
+        if (newState === null) {
+          newDidTimeout = false;
+        } else {
+          newDidTimeout = true;
+          primaryChildParent = finishedWork.child;
+          if (newState.timedOutAt === NoWork) {
+            // If the children had not already timed out, record the time.
+            // This is used to compute the elapsed time during subsequent
+            // attempts to render the children.
+            newState.timedOutAt = requestCurrentTime();
+          }
+        }
+
+        if (primaryChildParent !== null) {
+          hideOrUnhideAllChildren(primaryChildParent, newDidTimeout);
+        }
+
+        // If this boundary just timed out, then it will have a set of thenables.
+        // For each thenable, attach a listener so that when it resolves, React
+        // attempts to re-render the boundary in the primary (pre-timeout) state.
+        var thenables = finishedWork.updateQueue;
+        if (thenables !== null) {
+          finishedWork.updateQueue = null;
+          var retryCache = finishedWork.stateNode;
+          if (retryCache === null) {
+            retryCache = finishedWork.stateNode = new PossiblyWeakSet$1();
+          }
+          thenables.forEach(function (thenable) {
+            // Memoize using the boundary fiber to prevent redundant listeners.
+            var retry = retryTimedOutBoundary.bind(null, finishedWork, thenable);
+            if (enableSchedulerTracing) {
+              retry = tracing.unstable_wrap(retry);
+            }
+            if (!retryCache.has(thenable)) {
+              retryCache.add(thenable);
+              thenable.then(retry, retry);
+            }
+          });
+        }
+
+        return;
+      }
+    case IncompleteClassComponent:
+      {
+        return;
+      }
+    default:
+      {
+        invariant(false, 'This unit of work tag should not have side-effects. This error is likely caused by a bug in React. Please file an issue.');
+      }
+  }
+}
+
+function commitResetTextContent(current$$1) {
+  if (!supportsMutation) {
+    return;
+  }
+  resetTextContent(current$$1.stateNode);
+}
+
+var PossiblyWeakSet = typeof WeakSet === 'function' ? WeakSet : Set;
+var PossiblyWeakMap = typeof WeakMap === 'function' ? WeakMap : Map;
+
+function createRootErrorUpdate(fiber, errorInfo, expirationTime) {
+  var update = createUpdate(expirationTime);
+  // Unmount the root by rendering null.
+  update.tag = CaptureUpdate;
+  // Caution: React DevTools currently depends on this property
+  // being called "element".
+  update.payload = { element: null };
+  var error = errorInfo.value;
+  update.callback = function () {
+    onUncaughtError(error);
+    logError(fiber, errorInfo);
+  };
+  return update;
+}
+
+function createClassErrorUpdate(fiber, errorInfo, expirationTime) {
+  var update = createUpdate(expirationTime);
+  update.tag = CaptureUpdate;
+  var getDerivedStateFromError = fiber.type.getDerivedStateFromError;
+  if (typeof getDerivedStateFromError === 'function') {
+    var error = errorInfo.value;
