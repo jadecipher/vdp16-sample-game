@@ -39776,3 +39776,192 @@ function throwException(root, returnFiber, sourceFiber, value, renderExpirationT
         }
 
         // Mark the earliest timeout in the suspended fiber's ancestor path.
+        // After completing the root, we'll take the largest of all the
+        // suspended fiber's timeouts and use it to compute a timeout for the
+        // whole tree.
+        renderDidSuspend(root, absoluteTimeoutMs, renderExpirationTime);
+
+        _workInProgress.effectTag |= ShouldCapture;
+        _workInProgress.expirationTime = renderExpirationTime;
+        return;
+      } else if (enableSuspenseServerRenderer && _workInProgress.tag === DehydratedSuspenseComponent) {
+        attachPingListener(root, renderExpirationTime, thenable);
+
+        // Since we already have a current fiber, we can eagerly add a retry listener.
+        var retryCache = _workInProgress.memoizedState;
+        if (retryCache === null) {
+          retryCache = _workInProgress.memoizedState = new PossiblyWeakSet();
+          var _current = _workInProgress.alternate;
+          !_current ? invariant(false, 'A dehydrated suspense boundary must commit before trying to render. This is probably a bug in React.') : void 0;
+          _current.memoizedState = retryCache;
+        }
+        // Memoize using the boundary fiber to prevent redundant listeners.
+        if (!retryCache.has(thenable)) {
+          retryCache.add(thenable);
+          var retry = retryTimedOutBoundary.bind(null, _workInProgress, thenable);
+          if (enableSchedulerTracing) {
+            retry = tracing.unstable_wrap(retry);
+          }
+          thenable.then(retry, retry);
+        }
+        _workInProgress.effectTag |= ShouldCapture;
+        _workInProgress.expirationTime = renderExpirationTime;
+        return;
+      }
+      // This boundary already captured during this render. Continue to the next
+      // boundary.
+      _workInProgress = _workInProgress.return;
+    } while (_workInProgress !== null);
+    // No boundary was found. Fallthrough to error mode.
+    // TODO: Use invariant so the message is stripped in prod?
+    value = new Error((getComponentName(sourceFiber.type) || 'A React component') + ' suspended while rendering, but no fallback UI was specified.\n' + '\n' + 'Add a <Suspense fallback=...> component higher in the tree to ' + 'provide a loading indicator or placeholder to display.' + getStackByFiberInDevAndProd(sourceFiber));
+  }
+
+  // We didn't find a boundary that could handle this type of exception. Start
+  // over and traverse parent path again, this time treating the exception
+  // as an error.
+  renderDidError();
+  value = createCapturedValue(value, sourceFiber);
+  var workInProgress = returnFiber;
+  do {
+    switch (workInProgress.tag) {
+      case HostRoot:
+        {
+          var _errorInfo = value;
+          workInProgress.effectTag |= ShouldCapture;
+          workInProgress.expirationTime = renderExpirationTime;
+          var _update = createRootErrorUpdate(workInProgress, _errorInfo, renderExpirationTime);
+          enqueueCapturedUpdate(workInProgress, _update);
+          return;
+        }
+      case ClassComponent:
+        // Capture and retry
+        var errorInfo = value;
+        var ctor = workInProgress.type;
+        var instance = workInProgress.stateNode;
+        if ((workInProgress.effectTag & DidCapture) === NoEffect && (typeof ctor.getDerivedStateFromError === 'function' || instance !== null && typeof instance.componentDidCatch === 'function' && !isAlreadyFailedLegacyErrorBoundary(instance))) {
+          workInProgress.effectTag |= ShouldCapture;
+          workInProgress.expirationTime = renderExpirationTime;
+          // Schedule the error boundary to re-render using updated state
+          var _update2 = createClassErrorUpdate(workInProgress, errorInfo, renderExpirationTime);
+          enqueueCapturedUpdate(workInProgress, _update2);
+          return;
+        }
+        break;
+      default:
+        break;
+    }
+    workInProgress = workInProgress.return;
+  } while (workInProgress !== null);
+}
+
+function unwindWork(workInProgress, renderExpirationTime) {
+  switch (workInProgress.tag) {
+    case ClassComponent:
+      {
+        var Component = workInProgress.type;
+        if (isContextProvider(Component)) {
+          popContext(workInProgress);
+        }
+        var effectTag = workInProgress.effectTag;
+        if (effectTag & ShouldCapture) {
+          workInProgress.effectTag = effectTag & ~ShouldCapture | DidCapture;
+          return workInProgress;
+        }
+        return null;
+      }
+    case HostRoot:
+      {
+        popHostContainer(workInProgress);
+        popTopLevelContextObject(workInProgress);
+        var _effectTag = workInProgress.effectTag;
+        !((_effectTag & DidCapture) === NoEffect) ? invariant(false, 'The root failed to unmount after an error. This is likely a bug in React. Please file an issue.') : void 0;
+        workInProgress.effectTag = _effectTag & ~ShouldCapture | DidCapture;
+        return workInProgress;
+      }
+    case HostComponent:
+      {
+        // TODO: popHydrationState
+        popHostContext(workInProgress);
+        return null;
+      }
+    case SuspenseComponent:
+      {
+        var _effectTag2 = workInProgress.effectTag;
+        if (_effectTag2 & ShouldCapture) {
+          workInProgress.effectTag = _effectTag2 & ~ShouldCapture | DidCapture;
+          // Captured a suspense effect. Re-render the boundary.
+          return workInProgress;
+        }
+        return null;
+      }
+    case DehydratedSuspenseComponent:
+      {
+        if (enableSuspenseServerRenderer) {
+          // TODO: popHydrationState
+          var _effectTag3 = workInProgress.effectTag;
+          if (_effectTag3 & ShouldCapture) {
+            workInProgress.effectTag = _effectTag3 & ~ShouldCapture | DidCapture;
+            // Captured a suspense effect. Re-render the boundary.
+            return workInProgress;
+          }
+        }
+        return null;
+      }
+    case HostPortal:
+      popHostContainer(workInProgress);
+      return null;
+    case ContextProvider:
+      popProvider(workInProgress);
+      return null;
+    default:
+      return null;
+  }
+}
+
+function unwindInterruptedWork(interruptedWork) {
+  switch (interruptedWork.tag) {
+    case ClassComponent:
+      {
+        var childContextTypes = interruptedWork.type.childContextTypes;
+        if (childContextTypes !== null && childContextTypes !== undefined) {
+          popContext(interruptedWork);
+        }
+        break;
+      }
+    case HostRoot:
+      {
+        popHostContainer(interruptedWork);
+        popTopLevelContextObject(interruptedWork);
+        break;
+      }
+    case HostComponent:
+      {
+        popHostContext(interruptedWork);
+        break;
+      }
+    case HostPortal:
+      popHostContainer(interruptedWork);
+      break;
+    case ContextProvider:
+      popProvider(interruptedWork);
+      break;
+    default:
+      break;
+  }
+}
+
+var ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
+var ReactCurrentOwner$2 = ReactSharedInternals.ReactCurrentOwner;
+
+
+var didWarnAboutStateTransition = void 0;
+var didWarnSetStateChildContext = void 0;
+var warnAboutUpdateOnUnmounted = void 0;
+var warnAboutInvalidUpdates = void 0;
+
+if (enableSchedulerTracing) {
+  // Provide explicit error message when production+profiling bundle of e.g. react-dom
+  // is used with production (non-profiling) bundle of scheduler/tracing
+  !(tracing.__interactionsRef != null && tracing.__interactionsRef.current != null) ? invariant(false, 'It is not supported to run the profiling version of a renderer (for example, `react-dom/profiling`) without also replacing the `scheduler/tracing` module with `scheduler/tracing-profiling`. Your bundler might have a setting for aliasing both modules. Learn more at http://fb.me/react-profiling') : void 0;
+}
