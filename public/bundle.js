@@ -39965,3 +39965,194 @@ if (enableSchedulerTracing) {
   // is used with production (non-profiling) bundle of scheduler/tracing
   !(tracing.__interactionsRef != null && tracing.__interactionsRef.current != null) ? invariant(false, 'It is not supported to run the profiling version of a renderer (for example, `react-dom/profiling`) without also replacing the `scheduler/tracing` module with `scheduler/tracing-profiling`. Your bundler might have a setting for aliasing both modules. Learn more at http://fb.me/react-profiling') : void 0;
 }
+
+{
+  didWarnAboutStateTransition = false;
+  didWarnSetStateChildContext = false;
+  var didWarnStateUpdateForUnmountedComponent = {};
+
+  warnAboutUpdateOnUnmounted = function (fiber, isClass) {
+    // We show the whole stack but dedupe on the top component's name because
+    // the problematic code almost always lies inside that component.
+    var componentName = getComponentName(fiber.type) || 'ReactComponent';
+    if (didWarnStateUpdateForUnmountedComponent[componentName]) {
+      return;
+    }
+    warningWithoutStack$1(false, "Can't perform a React state update on an unmounted component. This " + 'is a no-op, but it indicates a memory leak in your application. To ' + 'fix, cancel all subscriptions and asynchronous tasks in %s.%s', isClass ? 'the componentWillUnmount method' : 'a useEffect cleanup function', getStackByFiberInDevAndProd(fiber));
+    didWarnStateUpdateForUnmountedComponent[componentName] = true;
+  };
+
+  warnAboutInvalidUpdates = function (instance) {
+    switch (phase) {
+      case 'getChildContext':
+        if (didWarnSetStateChildContext) {
+          return;
+        }
+        warningWithoutStack$1(false, 'setState(...): Cannot call setState() inside getChildContext()');
+        didWarnSetStateChildContext = true;
+        break;
+      case 'render':
+        if (didWarnAboutStateTransition) {
+          return;
+        }
+        warningWithoutStack$1(false, 'Cannot update during an existing state transition (such as within ' + '`render`). Render methods should be a pure function of props and state.');
+        didWarnAboutStateTransition = true;
+        break;
+    }
+  };
+}
+
+// Used to ensure computeUniqueAsyncExpiration is monotonically decreasing.
+var lastUniqueAsyncExpiration = Sync - 1;
+
+var isWorking = false;
+
+// The next work in progress fiber that we're currently working on.
+var nextUnitOfWork = null;
+var nextRoot = null;
+// The time at which we're currently rendering work.
+var nextRenderExpirationTime = NoWork;
+var nextLatestAbsoluteTimeoutMs = -1;
+var nextRenderDidError = false;
+
+// The next fiber with an effect that we're currently committing.
+var nextEffect = null;
+
+var isCommitting$1 = false;
+var rootWithPendingPassiveEffects = null;
+var passiveEffectCallbackHandle = null;
+var passiveEffectCallback = null;
+
+var legacyErrorBoundariesThatAlreadyFailed = null;
+
+// Used for performance tracking.
+var interruptedBy = null;
+
+var stashedWorkInProgressProperties = void 0;
+var replayUnitOfWork = void 0;
+var mayReplayFailedUnitOfWork = void 0;
+var isReplayingFailedUnitOfWork = void 0;
+var originalReplayError = void 0;
+var rethrowOriginalError = void 0;
+if ( true && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
+  stashedWorkInProgressProperties = null;
+  mayReplayFailedUnitOfWork = true;
+  isReplayingFailedUnitOfWork = false;
+  originalReplayError = null;
+  replayUnitOfWork = function (failedUnitOfWork, thrownValue, isYieldy) {
+    if (thrownValue !== null && typeof thrownValue === 'object' && typeof thrownValue.then === 'function') {
+      // Don't replay promises. Treat everything else like an error.
+      // TODO: Need to figure out a different strategy if/when we add
+      // support for catching other types.
+      return;
+    }
+
+    // Restore the original state of the work-in-progress
+    if (stashedWorkInProgressProperties === null) {
+      // This should never happen. Don't throw because this code is DEV-only.
+      warningWithoutStack$1(false, 'Could not replay rendering after an error. This is likely a bug in React. ' + 'Please file an issue.');
+      return;
+    }
+    assignFiberPropertiesInDEV(failedUnitOfWork, stashedWorkInProgressProperties);
+
+    switch (failedUnitOfWork.tag) {
+      case HostRoot:
+        popHostContainer(failedUnitOfWork);
+        popTopLevelContextObject(failedUnitOfWork);
+        break;
+      case HostComponent:
+        popHostContext(failedUnitOfWork);
+        break;
+      case ClassComponent:
+        {
+          var Component = failedUnitOfWork.type;
+          if (isContextProvider(Component)) {
+            popContext(failedUnitOfWork);
+          }
+          break;
+        }
+      case HostPortal:
+        popHostContainer(failedUnitOfWork);
+        break;
+      case ContextProvider:
+        popProvider(failedUnitOfWork);
+        break;
+    }
+    // Replay the begin phase.
+    isReplayingFailedUnitOfWork = true;
+    originalReplayError = thrownValue;
+    invokeGuardedCallback(null, workLoop, null, isYieldy);
+    isReplayingFailedUnitOfWork = false;
+    originalReplayError = null;
+    if (hasCaughtError()) {
+      var replayError = clearCaughtError();
+      if (replayError != null && thrownValue != null) {
+        try {
+          // Reading the expando property is intentionally
+          // inside `try` because it might be a getter or Proxy.
+          if (replayError._suppressLogging) {
+            // Also suppress logging for the original error.
+            thrownValue._suppressLogging = true;
+          }
+        } catch (inner) {
+          // Ignore.
+        }
+      }
+    } else {
+      // If the begin phase did not fail the second time, set this pointer
+      // back to the original value.
+      nextUnitOfWork = failedUnitOfWork;
+    }
+  };
+  rethrowOriginalError = function () {
+    throw originalReplayError;
+  };
+}
+
+function resetStack() {
+  if (nextUnitOfWork !== null) {
+    var interruptedWork = nextUnitOfWork.return;
+    while (interruptedWork !== null) {
+      unwindInterruptedWork(interruptedWork);
+      interruptedWork = interruptedWork.return;
+    }
+  }
+
+  {
+    ReactStrictModeWarnings.discardPendingWarnings();
+    checkThatStackIsEmpty();
+  }
+
+  nextRoot = null;
+  nextRenderExpirationTime = NoWork;
+  nextLatestAbsoluteTimeoutMs = -1;
+  nextRenderDidError = false;
+  nextUnitOfWork = null;
+}
+
+function commitAllHostEffects() {
+  while (nextEffect !== null) {
+    {
+      setCurrentFiber(nextEffect);
+    }
+    recordEffect();
+
+    var effectTag = nextEffect.effectTag;
+
+    if (effectTag & ContentReset) {
+      commitResetTextContent(nextEffect);
+    }
+
+    if (effectTag & Ref) {
+      var current$$1 = nextEffect.alternate;
+      if (current$$1 !== null) {
+        commitDetachRef(current$$1);
+      }
+    }
+
+    // The following switch statement is only concerned about placement,
+    // updates, and deletions. To avoid needing to add a case for every
+    // possible bitmap value, we remove the secondary effects from the
+    // effect tag and switch on that value.
+    var primaryEffectTag = effectTag & (Placement | Update | Deletion);
+    switch (primaryEffectTag) {
