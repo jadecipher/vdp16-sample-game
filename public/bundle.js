@@ -40931,3 +40931,196 @@ function renderRoot(root, isYieldy) {
     prevInteractions = tracing.__interactionsRef.current;
     tracing.__interactionsRef.current = root.memoizedInteractions;
   }
+
+  var didFatal = false;
+
+  startWorkLoopTimer(nextUnitOfWork);
+
+  do {
+    try {
+      workLoop(isYieldy);
+    } catch (thrownValue) {
+      resetContextDependences();
+      resetHooks();
+
+      // Reset in case completion throws.
+      // This is only used in DEV and when replaying is on.
+      var mayReplay = void 0;
+      if ( true && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
+        mayReplay = mayReplayFailedUnitOfWork;
+        mayReplayFailedUnitOfWork = true;
+      }
+
+      if (nextUnitOfWork === null) {
+        // This is a fatal error.
+        didFatal = true;
+        onUncaughtError(thrownValue);
+      } else {
+        if (enableProfilerTimer && nextUnitOfWork.mode & ProfileMode) {
+          // Record the time spent rendering before an error was thrown.
+          // This avoids inaccurate Profiler durations in the case of a suspended render.
+          stopProfilerTimerIfRunningAndRecordDelta(nextUnitOfWork, true);
+        }
+
+        {
+          // Reset global debug state
+          // We assume this is defined in DEV
+          resetCurrentlyProcessingQueue();
+        }
+
+        if ( true && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
+          if (mayReplay) {
+            var failedUnitOfWork = nextUnitOfWork;
+            replayUnitOfWork(failedUnitOfWork, thrownValue, isYieldy);
+          }
+        }
+
+        // TODO: we already know this isn't true in some cases.
+        // At least this shows a nicer error message until we figure out the cause.
+        // https://github.com/facebook/react/issues/12449#issuecomment-386727431
+        !(nextUnitOfWork !== null) ? invariant(false, 'Failed to replay rendering after an error. This is likely caused by a bug in React. Please file an issue with a reproducing case to help us find it.') : void 0;
+
+        var sourceFiber = nextUnitOfWork;
+        var returnFiber = sourceFiber.return;
+        if (returnFiber === null) {
+          // This is the root. The root could capture its own errors. However,
+          // we don't know if it errors before or after we pushed the host
+          // context. This information is needed to avoid a stack mismatch.
+          // Because we're not sure, treat this as a fatal error. We could track
+          // which phase it fails in, but doesn't seem worth it. At least
+          // for now.
+          didFatal = true;
+          onUncaughtError(thrownValue);
+        } else {
+          throwException(root, returnFiber, sourceFiber, thrownValue, nextRenderExpirationTime);
+          nextUnitOfWork = completeUnitOfWork(sourceFiber);
+          continue;
+        }
+      }
+    }
+    break;
+  } while (true);
+
+  if (enableSchedulerTracing) {
+    // Traced work is done for now; restore the previous interactions.
+    tracing.__interactionsRef.current = prevInteractions;
+  }
+
+  // We're done performing work. Time to clean up.
+  isWorking = false;
+  ReactCurrentDispatcher.current = previousDispatcher;
+  resetContextDependences();
+  resetHooks();
+
+  // Yield back to main thread.
+  if (didFatal) {
+    var _didCompleteRoot = false;
+    stopWorkLoopTimer(interruptedBy, _didCompleteRoot);
+    interruptedBy = null;
+    // There was a fatal error.
+    {
+      resetStackAfterFatalErrorInDev();
+    }
+    // `nextRoot` points to the in-progress root. A non-null value indicates
+    // that we're in the middle of an async render. Set it to null to indicate
+    // there's no more work to be done in the current batch.
+    nextRoot = null;
+    onFatal(root);
+    return;
+  }
+
+  if (nextUnitOfWork !== null) {
+    // There's still remaining async work in this tree, but we ran out of time
+    // in the current frame. Yield back to the renderer. Unless we're
+    // interrupted by a higher priority update, we'll continue later from where
+    // we left off.
+    var _didCompleteRoot2 = false;
+    stopWorkLoopTimer(interruptedBy, _didCompleteRoot2);
+    interruptedBy = null;
+    onYield(root);
+    return;
+  }
+
+  // We completed the whole tree.
+  var didCompleteRoot = true;
+  stopWorkLoopTimer(interruptedBy, didCompleteRoot);
+  var rootWorkInProgress = root.current.alternate;
+  !(rootWorkInProgress !== null) ? invariant(false, 'Finished root should have a work-in-progress. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+
+  // `nextRoot` points to the in-progress root. A non-null value indicates
+  // that we're in the middle of an async render. Set it to null to indicate
+  // there's no more work to be done in the current batch.
+  nextRoot = null;
+  interruptedBy = null;
+
+  if (nextRenderDidError) {
+    // There was an error
+    if (hasLowerPriorityWork(root, expirationTime)) {
+      // There's lower priority work. If so, it may have the effect of fixing
+      // the exception that was just thrown. Exit without committing. This is
+      // similar to a suspend, but without a timeout because we're not waiting
+      // for a promise to resolve. React will restart at the lower
+      // priority level.
+      markSuspendedPriorityLevel(root, expirationTime);
+      var suspendedExpirationTime = expirationTime;
+      var rootExpirationTime = root.expirationTime;
+      onSuspend(root, rootWorkInProgress, suspendedExpirationTime, rootExpirationTime, -1 // Indicates no timeout
+      );
+      return;
+    } else if (
+    // There's no lower priority work, but we're rendering asynchronously.
+    // Synchronously attempt to render the same level one more time. This is
+    // similar to a suspend, but without a timeout because we're not waiting
+    // for a promise to resolve.
+    !root.didError && isYieldy) {
+      root.didError = true;
+      var _suspendedExpirationTime = root.nextExpirationTimeToWorkOn = expirationTime;
+      var _rootExpirationTime = root.expirationTime = Sync;
+      onSuspend(root, rootWorkInProgress, _suspendedExpirationTime, _rootExpirationTime, -1 // Indicates no timeout
+      );
+      return;
+    }
+  }
+
+  if (isYieldy && nextLatestAbsoluteTimeoutMs !== -1) {
+    // The tree was suspended.
+    var _suspendedExpirationTime2 = expirationTime;
+    markSuspendedPriorityLevel(root, _suspendedExpirationTime2);
+
+    // Find the earliest uncommitted expiration time in the tree, including
+    // work that is suspended. The timeout threshold cannot be longer than
+    // the overall expiration.
+    var earliestExpirationTime = findEarliestOutstandingPriorityLevel(root, expirationTime);
+    var earliestExpirationTimeMs = expirationTimeToMs(earliestExpirationTime);
+    if (earliestExpirationTimeMs < nextLatestAbsoluteTimeoutMs) {
+      nextLatestAbsoluteTimeoutMs = earliestExpirationTimeMs;
+    }
+
+    // Subtract the current time from the absolute timeout to get the number
+    // of milliseconds until the timeout. In other words, convert an absolute
+    // timestamp to a relative time. This is the value that is passed
+    // to `setTimeout`.
+    var currentTimeMs = expirationTimeToMs(requestCurrentTime());
+    var msUntilTimeout = nextLatestAbsoluteTimeoutMs - currentTimeMs;
+    msUntilTimeout = msUntilTimeout < 0 ? 0 : msUntilTimeout;
+
+    // TODO: Account for the Just Noticeable Difference
+
+    var _rootExpirationTime2 = root.expirationTime;
+    onSuspend(root, rootWorkInProgress, _suspendedExpirationTime2, _rootExpirationTime2, msUntilTimeout);
+    return;
+  }
+
+  // Ready to commit.
+  onComplete(root, rootWorkInProgress, expirationTime);
+}
+
+function captureCommitPhaseError(sourceFiber, value) {
+  var expirationTime = Sync;
+  var fiber = sourceFiber.return;
+  while (fiber !== null) {
+    switch (fiber.tag) {
+      case ClassComponent:
+        var ctor = fiber.type;
+        var instance = fiber.stateNode;
+        if (typeof ctor.getDerivedStateFromError === 'function' || typeof instance.componentDidCatch === 'function' && !isAlreadyFailedLegacyErrorBoundary(instance)) {
