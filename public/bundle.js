@@ -41124,3 +41124,200 @@ function captureCommitPhaseError(sourceFiber, value) {
         var ctor = fiber.type;
         var instance = fiber.stateNode;
         if (typeof ctor.getDerivedStateFromError === 'function' || typeof instance.componentDidCatch === 'function' && !isAlreadyFailedLegacyErrorBoundary(instance)) {
+          var errorInfo = createCapturedValue(value, sourceFiber);
+          var update = createClassErrorUpdate(fiber, errorInfo, expirationTime);
+          enqueueUpdate(fiber, update);
+          scheduleWork(fiber, expirationTime);
+          return;
+        }
+        break;
+      case HostRoot:
+        {
+          var _errorInfo = createCapturedValue(value, sourceFiber);
+          var _update = createRootErrorUpdate(fiber, _errorInfo, expirationTime);
+          enqueueUpdate(fiber, _update);
+          scheduleWork(fiber, expirationTime);
+          return;
+        }
+    }
+    fiber = fiber.return;
+  }
+
+  if (sourceFiber.tag === HostRoot) {
+    // Error was thrown at the root. There is no parent, so the root
+    // itself should capture it.
+    var rootFiber = sourceFiber;
+    var _errorInfo2 = createCapturedValue(value, rootFiber);
+    var _update2 = createRootErrorUpdate(rootFiber, _errorInfo2, expirationTime);
+    enqueueUpdate(rootFiber, _update2);
+    scheduleWork(rootFiber, expirationTime);
+  }
+}
+
+function computeThreadID(expirationTime, interactionThreadID) {
+  // Interaction threads are unique per root and expiration time.
+  return expirationTime * 1000 + interactionThreadID;
+}
+
+// Creates a unique async expiration time.
+function computeUniqueAsyncExpiration() {
+  var currentTime = requestCurrentTime();
+  var result = computeAsyncExpiration(currentTime);
+  if (result >= lastUniqueAsyncExpiration) {
+    // Since we assume the current time monotonically increases, we only hit
+    // this branch when computeUniqueAsyncExpiration is fired multiple times
+    // within a 200ms window (or whatever the async bucket size is).
+    result = lastUniqueAsyncExpiration - 1;
+  }
+  lastUniqueAsyncExpiration = result;
+  return lastUniqueAsyncExpiration;
+}
+
+function computeExpirationForFiber(currentTime, fiber) {
+  var priorityLevel = scheduler.unstable_getCurrentPriorityLevel();
+
+  var expirationTime = void 0;
+  if ((fiber.mode & ConcurrentMode) === NoContext) {
+    // Outside of concurrent mode, updates are always synchronous.
+    expirationTime = Sync;
+  } else if (isWorking && !isCommitting$1) {
+    // During render phase, updates expire during as the current render.
+    expirationTime = nextRenderExpirationTime;
+  } else {
+    switch (priorityLevel) {
+      case scheduler.unstable_ImmediatePriority:
+        expirationTime = Sync;
+        break;
+      case scheduler.unstable_UserBlockingPriority:
+        expirationTime = computeInteractiveExpiration(currentTime);
+        break;
+      case scheduler.unstable_NormalPriority:
+        // This is a normal, concurrent update
+        expirationTime = computeAsyncExpiration(currentTime);
+        break;
+      case scheduler.unstable_LowPriority:
+      case scheduler.unstable_IdlePriority:
+        expirationTime = Never;
+        break;
+      default:
+        invariant(false, 'Unknown priority level. This error is likely caused by a bug in React. Please file an issue.');
+    }
+
+    // If we're in the middle of rendering a tree, do not update at the same
+    // expiration time that is already rendering.
+    if (nextRoot !== null && expirationTime === nextRenderExpirationTime) {
+      expirationTime -= 1;
+    }
+  }
+
+  // Keep track of the lowest pending interactive expiration time. This
+  // allows us to synchronously flush all interactive updates
+  // when needed.
+  // TODO: Move this to renderer?
+  if (priorityLevel === scheduler.unstable_UserBlockingPriority && (lowestPriorityPendingInteractiveExpirationTime === NoWork || expirationTime < lowestPriorityPendingInteractiveExpirationTime)) {
+    lowestPriorityPendingInteractiveExpirationTime = expirationTime;
+  }
+
+  return expirationTime;
+}
+
+function renderDidSuspend(root, absoluteTimeoutMs, suspendedTime) {
+  // Schedule the timeout.
+  if (absoluteTimeoutMs >= 0 && nextLatestAbsoluteTimeoutMs < absoluteTimeoutMs) {
+    nextLatestAbsoluteTimeoutMs = absoluteTimeoutMs;
+  }
+}
+
+function renderDidError() {
+  nextRenderDidError = true;
+}
+
+function pingSuspendedRoot(root, thenable, pingTime) {
+  // A promise that previously suspended React from committing has resolved.
+  // If React is still suspended, try again at the previous level (pingTime).
+
+  var pingCache = root.pingCache;
+  if (pingCache !== null) {
+    // The thenable resolved, so we no longer need to memoize, because it will
+    // never be thrown again.
+    pingCache.delete(thenable);
+  }
+
+  if (nextRoot !== null && nextRenderExpirationTime === pingTime) {
+    // Received a ping at the same priority level at which we're currently
+    // rendering. Restart from the root.
+    nextRoot = null;
+  } else {
+    // Confirm that the root is still suspended at this level. Otherwise exit.
+    if (isPriorityLevelSuspended(root, pingTime)) {
+      // Ping at the original level
+      markPingedPriorityLevel(root, pingTime);
+      var rootExpirationTime = root.expirationTime;
+      if (rootExpirationTime !== NoWork) {
+        requestWork(root, rootExpirationTime);
+      }
+    }
+  }
+}
+
+function retryTimedOutBoundary(boundaryFiber, thenable) {
+  // The boundary fiber (a Suspense component) previously timed out and was
+  // rendered in its fallback state. One of the promises that suspended it has
+  // resolved, which means at least part of the tree was likely unblocked. Try
+  var retryCache = void 0;
+  if (enableSuspenseServerRenderer) {
+    switch (boundaryFiber.tag) {
+      case SuspenseComponent:
+        retryCache = boundaryFiber.stateNode;
+        break;
+      case DehydratedSuspenseComponent:
+        retryCache = boundaryFiber.memoizedState;
+        break;
+      default:
+        invariant(false, 'Pinged unknown suspense boundary type. This is probably a bug in React.');
+    }
+  } else {
+    retryCache = boundaryFiber.stateNode;
+  }
+  if (retryCache !== null) {
+    // The thenable resolved, so we no longer need to memoize, because it will
+    // never be thrown again.
+    retryCache.delete(thenable);
+  }
+
+  var currentTime = requestCurrentTime();
+  var retryTime = computeExpirationForFiber(currentTime, boundaryFiber);
+  var root = scheduleWorkToRoot(boundaryFiber, retryTime);
+  if (root !== null) {
+    markPendingPriorityLevel(root, retryTime);
+    var rootExpirationTime = root.expirationTime;
+    if (rootExpirationTime !== NoWork) {
+      requestWork(root, rootExpirationTime);
+    }
+  }
+}
+
+function scheduleWorkToRoot(fiber, expirationTime) {
+  recordScheduleUpdate();
+
+  {
+    if (fiber.tag === ClassComponent) {
+      var instance = fiber.stateNode;
+      warnAboutInvalidUpdates(instance);
+    }
+  }
+
+  // Update the source fiber's expiration time
+  if (fiber.expirationTime < expirationTime) {
+    fiber.expirationTime = expirationTime;
+  }
+  var alternate = fiber.alternate;
+  if (alternate !== null && alternate.expirationTime < expirationTime) {
+    alternate.expirationTime = expirationTime;
+  }
+  // Walk the parent path to the root and update the child expiration time.
+  var node = fiber.return;
+  var root = null;
+  if (node === null && fiber.tag === HostRoot) {
+    root = fiber.stateNode;
+  } else {
