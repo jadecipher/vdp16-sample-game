@@ -41860,3 +41860,196 @@ function performWorkOnRoot(root, expirationTime, isYieldy) {
       completeRoot(root, _finishedWork, expirationTime);
     } else {
       root.finishedWork = null;
+      // If this root previously suspended, clear its existing timeout, since
+      // we're about to try rendering again.
+      var _timeoutHandle = root.timeoutHandle;
+      if (_timeoutHandle !== noTimeout) {
+        root.timeoutHandle = noTimeout;
+        // $FlowFixMe Complains noTimeout is not a TimeoutID, despite the check above
+        cancelTimeout(_timeoutHandle);
+      }
+      renderRoot(root, isYieldy);
+      _finishedWork = root.finishedWork;
+      if (_finishedWork !== null) {
+        // We've completed the root. Check the if we should yield one more time
+        // before committing.
+        if (!shouldYieldToRenderer()) {
+          // Still time left. Commit the root.
+          completeRoot(root, _finishedWork, expirationTime);
+        } else {
+          // There's no time left. Mark this root as complete. We'll come
+          // back and commit it later.
+          root.finishedWork = _finishedWork;
+        }
+      }
+    }
+  }
+
+  isRendering = false;
+}
+
+function completeRoot(root, finishedWork, expirationTime) {
+  // Check if there's a batch that matches this expiration time.
+  var firstBatch = root.firstBatch;
+  if (firstBatch !== null && firstBatch._expirationTime >= expirationTime) {
+    if (completedBatches === null) {
+      completedBatches = [firstBatch];
+    } else {
+      completedBatches.push(firstBatch);
+    }
+    if (firstBatch._defer) {
+      // This root is blocked from committing by a batch. Unschedule it until
+      // we receive another update.
+      root.finishedWork = finishedWork;
+      root.expirationTime = NoWork;
+      return;
+    }
+  }
+
+  // Commit the root.
+  root.finishedWork = null;
+
+  // Check if this is a nested update (a sync update scheduled during the
+  // commit phase).
+  if (root === lastCommittedRootDuringThisBatch) {
+    // If the next root is the same as the previous root, this is a nested
+    // update. To prevent an infinite loop, increment the nested update count.
+    nestedUpdateCount++;
+  } else {
+    // Reset whenever we switch roots.
+    lastCommittedRootDuringThisBatch = root;
+    nestedUpdateCount = 0;
+  }
+  scheduler.unstable_runWithPriority(scheduler.unstable_ImmediatePriority, function () {
+    commitRoot(root, finishedWork);
+  });
+}
+
+function onUncaughtError(error) {
+  !(nextFlushedRoot !== null) ? invariant(false, 'Should be working on a root. This error is likely caused by a bug in React. Please file an issue.') : void 0;
+  // Unschedule this root so we don't work on it again until there's
+  // another update.
+  nextFlushedRoot.expirationTime = NoWork;
+  if (!hasUnhandledError) {
+    hasUnhandledError = true;
+    unhandledError = error;
+  }
+}
+
+// TODO: Batching should be implemented at the renderer level, not inside
+// the reconciler.
+function batchedUpdates$1(fn, a) {
+  var previousIsBatchingUpdates = isBatchingUpdates;
+  isBatchingUpdates = true;
+  try {
+    return fn(a);
+  } finally {
+    isBatchingUpdates = previousIsBatchingUpdates;
+    if (!isBatchingUpdates && !isRendering) {
+      performSyncWork();
+    }
+  }
+}
+
+// TODO: Batching should be implemented at the renderer level, not inside
+// the reconciler.
+function unbatchedUpdates(fn, a) {
+  if (isBatchingUpdates && !isUnbatchingUpdates) {
+    isUnbatchingUpdates = true;
+    try {
+      return fn(a);
+    } finally {
+      isUnbatchingUpdates = false;
+    }
+  }
+  return fn(a);
+}
+
+// TODO: Batching should be implemented at the renderer level, not within
+// the reconciler.
+function flushSync(fn, a) {
+  !!isRendering ? invariant(false, 'flushSync was called from inside a lifecycle method. It cannot be called when React is already rendering.') : void 0;
+  var previousIsBatchingUpdates = isBatchingUpdates;
+  isBatchingUpdates = true;
+  try {
+    return syncUpdates(fn, a);
+  } finally {
+    isBatchingUpdates = previousIsBatchingUpdates;
+    performSyncWork();
+  }
+}
+
+function interactiveUpdates$1(fn, a, b) {
+  // If there are any pending interactive updates, synchronously flush them.
+  // This needs to happen before we read any handlers, because the effect of
+  // the previous event may influence which handlers are called during
+  // this event.
+  if (!isBatchingUpdates && !isRendering && lowestPriorityPendingInteractiveExpirationTime !== NoWork) {
+    // Synchronously flush pending interactive updates.
+    performWork(lowestPriorityPendingInteractiveExpirationTime, false);
+    lowestPriorityPendingInteractiveExpirationTime = NoWork;
+  }
+  var previousIsBatchingUpdates = isBatchingUpdates;
+  isBatchingUpdates = true;
+  try {
+    return scheduler.unstable_runWithPriority(scheduler.unstable_UserBlockingPriority, function () {
+      return fn(a, b);
+    });
+  } finally {
+    isBatchingUpdates = previousIsBatchingUpdates;
+    if (!isBatchingUpdates && !isRendering) {
+      performSyncWork();
+    }
+  }
+}
+
+function flushInteractiveUpdates$1() {
+  if (!isRendering && lowestPriorityPendingInteractiveExpirationTime !== NoWork) {
+    // Synchronously flush pending interactive updates.
+    performWork(lowestPriorityPendingInteractiveExpirationTime, false);
+    lowestPriorityPendingInteractiveExpirationTime = NoWork;
+  }
+}
+
+function flushControlled(fn) {
+  var previousIsBatchingUpdates = isBatchingUpdates;
+  isBatchingUpdates = true;
+  try {
+    syncUpdates(fn);
+  } finally {
+    isBatchingUpdates = previousIsBatchingUpdates;
+    if (!isBatchingUpdates && !isRendering) {
+      performSyncWork();
+    }
+  }
+}
+
+// 0 is PROD, 1 is DEV.
+// Might add PROFILE later.
+
+
+var didWarnAboutNestedUpdates = void 0;
+var didWarnAboutFindNodeInStrictMode = void 0;
+
+{
+  didWarnAboutNestedUpdates = false;
+  didWarnAboutFindNodeInStrictMode = {};
+}
+
+function getContextForSubtree(parentComponent) {
+  if (!parentComponent) {
+    return emptyContextObject;
+  }
+
+  var fiber = get(parentComponent);
+  var parentContext = findCurrentUnmaskedContext(fiber);
+
+  if (fiber.tag === ClassComponent) {
+    var Component = fiber.type;
+    if (isContextProvider(Component)) {
+      return processChildContext(fiber, Component, parentContext);
+    }
+  }
+
+  return parentContext;
+}
