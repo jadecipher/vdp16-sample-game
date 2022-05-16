@@ -42633,3 +42633,191 @@ var ReactDOM = {
         !warnedAboutRefsInRender ? warningWithoutStack$1(false, '%s is accessing findDOMNode inside its render(). ' + 'render() should be a pure function of props and state. It should ' + 'never access something that requires stale data from the previous ' + 'render, such as refs. Move this logic to componentDidMount and ' + 'componentDidUpdate instead.', getComponentName(owner.type) || 'A component') : void 0;
         owner.stateNode._warnedAboutRefsInRender = true;
       }
+    }
+    if (componentOrElement == null) {
+      return null;
+    }
+    if (componentOrElement.nodeType === ELEMENT_NODE) {
+      return componentOrElement;
+    }
+    {
+      return findHostInstanceWithWarning(componentOrElement, 'findDOMNode');
+    }
+    return findHostInstance(componentOrElement);
+  },
+  hydrate: function (element, container, callback) {
+    !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : void 0;
+    {
+      !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.hydrate() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. ' + 'Did you mean to call createRoot(container, {hydrate: true}).render(element)?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : void 0;
+    }
+    // TODO: throw or warn if we couldn't hydrate?
+    return legacyRenderSubtreeIntoContainer(null, element, container, true, callback);
+  },
+  render: function (element, container, callback) {
+    !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : void 0;
+    {
+      !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.render() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. ' + 'Did you mean to call root.render(element)?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : void 0;
+    }
+    return legacyRenderSubtreeIntoContainer(null, element, container, false, callback);
+  },
+  unstable_renderSubtreeIntoContainer: function (parentComponent, element, containerNode, callback) {
+    !isValidContainer(containerNode) ? invariant(false, 'Target container is not a DOM element.') : void 0;
+    !(parentComponent != null && has(parentComponent)) ? invariant(false, 'parentComponent must be a valid React Component') : void 0;
+    return legacyRenderSubtreeIntoContainer(parentComponent, element, containerNode, false, callback);
+  },
+  unmountComponentAtNode: function (container) {
+    !isValidContainer(container) ? invariant(false, 'unmountComponentAtNode(...): Target container is not a DOM element.') : void 0;
+
+    {
+      !!container._reactHasBeenPassedToCreateRootDEV ? warningWithoutStack$1(false, 'You are calling ReactDOM.unmountComponentAtNode() on a container that was previously ' + 'passed to ReactDOM.%s(). This is not supported. Did you mean to call root.unmount()?', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : void 0;
+    }
+
+    if (container._reactRootContainer) {
+      {
+        var rootEl = getReactRootElementInContainer(container);
+        var renderedByDifferentReact = rootEl && !getInstanceFromNode$1(rootEl);
+        !!renderedByDifferentReact ? warningWithoutStack$1(false, "unmountComponentAtNode(): The node you're attempting to unmount " + 'was rendered by another copy of React.') : void 0;
+      }
+
+      // Unmount should not be batched.
+      unbatchedUpdates(function () {
+        legacyRenderSubtreeIntoContainer(null, null, container, false, function () {
+          container._reactRootContainer = null;
+        });
+      });
+      // If you call unmountComponentAtNode twice in quick succession, you'll
+      // get `true` twice. That's probably fine?
+      return true;
+    } else {
+      {
+        var _rootEl = getReactRootElementInContainer(container);
+        var hasNonRootReactChild = !!(_rootEl && getInstanceFromNode$1(_rootEl));
+
+        // Check if the container itself is a React root node.
+        var isContainerReactRoot = container.nodeType === ELEMENT_NODE && isValidContainer(container.parentNode) && !!container.parentNode._reactRootContainer;
+
+        !!hasNonRootReactChild ? warningWithoutStack$1(false, "unmountComponentAtNode(): The node you're attempting to unmount " + 'was rendered by React and is not a top-level container. %s', isContainerReactRoot ? 'You may have accidentally passed in a React root node instead ' + 'of its container.' : 'Instead, have the parent component update its state and ' + 'rerender in order to remove this component.') : void 0;
+      }
+
+      return false;
+    }
+  },
+
+
+  // Temporary alias since we already shipped React 16 RC with it.
+  // TODO: remove in React 17.
+  unstable_createPortal: function () {
+    if (!didWarnAboutUnstableCreatePortal) {
+      didWarnAboutUnstableCreatePortal = true;
+      lowPriorityWarning$1(false, 'The ReactDOM.unstable_createPortal() alias has been deprecated, ' + 'and will be removed in React 17+. Update your code to use ' + 'ReactDOM.createPortal() instead. It has the exact same API, ' + 'but without the "unstable_" prefix.');
+    }
+    return createPortal$$1.apply(undefined, arguments);
+  },
+
+
+  unstable_batchedUpdates: batchedUpdates$1,
+
+  unstable_interactiveUpdates: interactiveUpdates$1,
+
+  flushSync: flushSync,
+
+  unstable_createRoot: createRoot,
+  unstable_flushControlled: flushControlled,
+
+  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
+    // Keep in sync with ReactDOMUnstableNativeDependencies.js
+    // and ReactTestUtils.js. This is an array for better minification.
+    Events: [getInstanceFromNode$1, getNodeFromInstance$1, getFiberCurrentPropsFromNode$1, injection.injectEventPluginsByName, eventNameDispatchConfigs, accumulateTwoPhaseDispatches, accumulateDirectDispatches, enqueueStateRestore, restoreStateIfNeeded, dispatchEvent, runEventsInBatch]
+  }
+};
+
+function createRoot(container, options) {
+  var functionName = enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot';
+  !isValidContainer(container) ? invariant(false, '%s(...): Target container is not a DOM element.', functionName) : void 0;
+  {
+    !!container._reactRootContainer ? warningWithoutStack$1(false, 'You are calling ReactDOM.%s() on a container that was previously ' + 'passed to ReactDOM.render(). This is not supported.', enableStableConcurrentModeAPIs ? 'createRoot' : 'unstable_createRoot') : void 0;
+    container._reactHasBeenPassedToCreateRootDEV = true;
+  }
+  var hydrate = options != null && options.hydrate === true;
+  return new ReactRoot(container, true, hydrate);
+}
+
+if (enableStableConcurrentModeAPIs) {
+  ReactDOM.createRoot = createRoot;
+  ReactDOM.unstable_createRoot = undefined;
+}
+
+var foundDevTools = injectIntoDevTools({
+  findFiberByHostInstance: getClosestInstanceFromNode,
+  bundleType: 1,
+  version: ReactVersion,
+  rendererPackageName: 'react-dom'
+});
+
+{
+  if (!foundDevTools && canUseDOM && window.top === window.self) {
+    // If we're in Chrome or Firefox, provide a download link if not installed.
+    if (navigator.userAgent.indexOf('Chrome') > -1 && navigator.userAgent.indexOf('Edge') === -1 || navigator.userAgent.indexOf('Firefox') > -1) {
+      var protocol = window.location.protocol;
+      // Don't warn in exotic cases like chrome-extension://.
+      if (/^(https?|file):$/.test(protocol)) {
+        console.info('%cDownload the React DevTools ' + 'for a better development experience: ' + 'https://fb.me/react-devtools' + (protocol === 'file:' ? '\nYou might need to use a local HTTP server (instead of file://): ' + 'https://fb.me/react-devtools-faq' : ''), 'font-weight:bold');
+      }
+    }
+  }
+}
+
+
+
+var ReactDOM$2 = Object.freeze({
+	default: ReactDOM
+});
+
+var ReactDOM$3 = ( ReactDOM$2 && ReactDOM ) || ReactDOM$2;
+
+// TODO: decide on the top-level export form.
+// This is hacky but makes it work with both Rollup and Jest.
+var reactDom = ReactDOM$3.default || ReactDOM$3;
+
+module.exports = reactDom;
+  })();
+}
+
+
+/***/ }),
+
+/***/ "./node_modules/react-dom/index.js":
+/*!*****************************************!*\
+  !*** ./node_modules/react-dom/index.js ***!
+  \*****************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+function checkDCE() {
+  /* global __REACT_DEVTOOLS_GLOBAL_HOOK__ */
+  if (
+    typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ === 'undefined' ||
+    typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE !== 'function'
+  ) {
+    return;
+  }
+  if (true) {
+    // This branch is unreachable because this function is only called
+    // in production, but the condition is true only in development.
+    // Therefore if the branch is still here, dead code elimination wasn't
+    // properly applied.
+    // Don't change the message. React DevTools relies on it. Also make sure
+    // this message doesn't occur elsewhere in this function, or it will cause
+    // a false positive.
+    throw new Error('^_^');
+  }
+  try {
+    // Verify that the code above has been dead code eliminated (DCE'd).
+    __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE(checkDCE);
+  } catch (err) {
+    // DevTools shouldn't crash React, no matter what.
+    // We should still report in case we break this code.
+    console.error(err);
