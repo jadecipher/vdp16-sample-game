@@ -42426,3 +42426,210 @@ ReactWork.prototype.then = function (onCommit) {
   callbacks.push(onCommit);
 };
 ReactWork.prototype._onCommit = function () {
+  if (this._didCommit) {
+    return;
+  }
+  this._didCommit = true;
+  var callbacks = this._callbacks;
+  if (callbacks === null) {
+    return;
+  }
+  // TODO: Error handling.
+  for (var i = 0; i < callbacks.length; i++) {
+    var _callback2 = callbacks[i];
+    !(typeof _callback2 === 'function') ? invariant(false, 'Invalid argument passed as callback. Expected a function. Instead received: %s', _callback2) : void 0;
+    _callback2();
+  }
+};
+
+function ReactRoot(container, isConcurrent, hydrate) {
+  var root = createContainer(container, isConcurrent, hydrate);
+  this._internalRoot = root;
+}
+ReactRoot.prototype.render = function (children, callback) {
+  var root = this._internalRoot;
+  var work = new ReactWork();
+  callback = callback === undefined ? null : callback;
+  {
+    warnOnInvalidCallback(callback, 'render');
+  }
+  if (callback !== null) {
+    work.then(callback);
+  }
+  updateContainer(children, root, null, work._onCommit);
+  return work;
+};
+ReactRoot.prototype.unmount = function (callback) {
+  var root = this._internalRoot;
+  var work = new ReactWork();
+  callback = callback === undefined ? null : callback;
+  {
+    warnOnInvalidCallback(callback, 'render');
+  }
+  if (callback !== null) {
+    work.then(callback);
+  }
+  updateContainer(null, root, null, work._onCommit);
+  return work;
+};
+ReactRoot.prototype.legacy_renderSubtreeIntoContainer = function (parentComponent, children, callback) {
+  var root = this._internalRoot;
+  var work = new ReactWork();
+  callback = callback === undefined ? null : callback;
+  {
+    warnOnInvalidCallback(callback, 'render');
+  }
+  if (callback !== null) {
+    work.then(callback);
+  }
+  updateContainer(children, root, parentComponent, work._onCommit);
+  return work;
+};
+ReactRoot.prototype.createBatch = function () {
+  var batch = new ReactBatch(this);
+  var expirationTime = batch._expirationTime;
+
+  var internalRoot = this._internalRoot;
+  var firstBatch = internalRoot.firstBatch;
+  if (firstBatch === null) {
+    internalRoot.firstBatch = batch;
+    batch._next = null;
+  } else {
+    // Insert sorted by expiration time then insertion order
+    var insertAfter = null;
+    var insertBefore = firstBatch;
+    while (insertBefore !== null && insertBefore._expirationTime >= expirationTime) {
+      insertAfter = insertBefore;
+      insertBefore = insertBefore._next;
+    }
+    batch._next = insertBefore;
+    if (insertAfter !== null) {
+      insertAfter._next = batch;
+    }
+  }
+
+  return batch;
+};
+
+/**
+ * True if the supplied DOM node is a valid node element.
+ *
+ * @param {?DOMElement} node The candidate DOM node.
+ * @return {boolean} True if the DOM is a valid DOM node.
+ * @internal
+ */
+function isValidContainer(node) {
+  return !!(node && (node.nodeType === ELEMENT_NODE || node.nodeType === DOCUMENT_NODE || node.nodeType === DOCUMENT_FRAGMENT_NODE || node.nodeType === COMMENT_NODE && node.nodeValue === ' react-mount-point-unstable '));
+}
+
+function getReactRootElementInContainer(container) {
+  if (!container) {
+    return null;
+  }
+
+  if (container.nodeType === DOCUMENT_NODE) {
+    return container.documentElement;
+  } else {
+    return container.firstChild;
+  }
+}
+
+function shouldHydrateDueToLegacyHeuristic(container) {
+  var rootElement = getReactRootElementInContainer(container);
+  return !!(rootElement && rootElement.nodeType === ELEMENT_NODE && rootElement.hasAttribute(ROOT_ATTRIBUTE_NAME));
+}
+
+setBatchingImplementation(batchedUpdates$1, interactiveUpdates$1, flushInteractiveUpdates$1);
+
+var warnedAboutHydrateAPI = false;
+
+function legacyCreateRootFromDOMContainer(container, forceHydrate) {
+  var shouldHydrate = forceHydrate || shouldHydrateDueToLegacyHeuristic(container);
+  // First clear any existing content.
+  if (!shouldHydrate) {
+    var warned = false;
+    var rootSibling = void 0;
+    while (rootSibling = container.lastChild) {
+      {
+        if (!warned && rootSibling.nodeType === ELEMENT_NODE && rootSibling.hasAttribute(ROOT_ATTRIBUTE_NAME)) {
+          warned = true;
+          warningWithoutStack$1(false, 'render(): Target node has markup rendered by React, but there ' + 'are unrelated nodes as well. This is most commonly caused by ' + 'white-space inserted around server-rendered markup.');
+        }
+      }
+      container.removeChild(rootSibling);
+    }
+  }
+  {
+    if (shouldHydrate && !forceHydrate && !warnedAboutHydrateAPI) {
+      warnedAboutHydrateAPI = true;
+      lowPriorityWarning$1(false, 'render(): Calling ReactDOM.render() to hydrate server-rendered markup ' + 'will stop working in React v17. Replace the ReactDOM.render() call ' + 'with ReactDOM.hydrate() if you want React to attach to the server HTML.');
+    }
+  }
+  // Legacy roots are not async by default.
+  var isConcurrent = false;
+  return new ReactRoot(container, isConcurrent, shouldHydrate);
+}
+
+function legacyRenderSubtreeIntoContainer(parentComponent, children, container, forceHydrate, callback) {
+  {
+    topLevelUpdateWarnings(container);
+  }
+
+  // TODO: Without `any` type, Flow says "Property cannot be accessed on any
+  // member of intersection type." Whyyyyyy.
+  var root = container._reactRootContainer;
+  if (!root) {
+    // Initial mount
+    root = container._reactRootContainer = legacyCreateRootFromDOMContainer(container, forceHydrate);
+    if (typeof callback === 'function') {
+      var originalCallback = callback;
+      callback = function () {
+        var instance = getPublicRootInstance(root._internalRoot);
+        originalCallback.call(instance);
+      };
+    }
+    // Initial mount should not be batched.
+    unbatchedUpdates(function () {
+      if (parentComponent != null) {
+        root.legacy_renderSubtreeIntoContainer(parentComponent, children, callback);
+      } else {
+        root.render(children, callback);
+      }
+    });
+  } else {
+    if (typeof callback === 'function') {
+      var _originalCallback = callback;
+      callback = function () {
+        var instance = getPublicRootInstance(root._internalRoot);
+        _originalCallback.call(instance);
+      };
+    }
+    // Update
+    if (parentComponent != null) {
+      root.legacy_renderSubtreeIntoContainer(parentComponent, children, callback);
+    } else {
+      root.render(children, callback);
+    }
+  }
+  return getPublicRootInstance(root._internalRoot);
+}
+
+function createPortal$$1(children, container) {
+  var key = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
+
+  !isValidContainer(container) ? invariant(false, 'Target container is not a DOM element.') : void 0;
+  // TODO: pass ReactDOM portal implementation as third argument
+  return createPortal$1(children, container, null, key);
+}
+
+var ReactDOM = {
+  createPortal: createPortal$$1,
+
+  findDOMNode: function (componentOrElement) {
+    {
+      var owner = ReactCurrentOwner.current;
+      if (owner !== null && owner.stateNode !== null) {
+        var warnedAboutRefsInRender = owner.stateNode._warnedAboutRefsInRender;
+        !warnedAboutRefsInRender ? warningWithoutStack$1(false, '%s is accessing findDOMNode inside its render(). ' + 'render() should be a pure function of props and state. It should ' + 'never access something that requires stale data from the previous ' + 'render, such as refs. Move this logic to componentDidMount and ' + 'componentDidUpdate instead.', getComponentName(owner.type) || 'A component') : void 0;
+        owner.stateNode._warnedAboutRefsInRender = true;
+      }
