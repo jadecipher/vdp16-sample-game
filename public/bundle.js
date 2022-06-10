@@ -49761,3 +49761,211 @@ exports.unstable_unsubscribe = unstable_unsubscribe;
 /*!*************************************************************!*\
   !*** ./node_modules/scheduler/cjs/scheduler.development.js ***!
   \*************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(global) {/** @license React v0.13.6
+ * scheduler.development.js
+ *
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+
+
+
+
+if (true) {
+  (function() {
+'use strict';
+
+Object.defineProperty(exports, '__esModule', { value: true });
+
+var enableSchedulerDebugging = false;
+
+/* eslint-disable no-var */
+
+// TODO: Use symbols?
+var ImmediatePriority = 1;
+var UserBlockingPriority = 2;
+var NormalPriority = 3;
+var LowPriority = 4;
+var IdlePriority = 5;
+
+// Max 31 bit integer. The max integer size in V8 for 32-bit systems.
+// Math.pow(2, 30) - 1
+// 0b111111111111111111111111111111
+var maxSigned31BitInt = 1073741823;
+
+// Times out immediately
+var IMMEDIATE_PRIORITY_TIMEOUT = -1;
+// Eventually times out
+var USER_BLOCKING_PRIORITY = 250;
+var NORMAL_PRIORITY_TIMEOUT = 5000;
+var LOW_PRIORITY_TIMEOUT = 10000;
+// Never times out
+var IDLE_PRIORITY = maxSigned31BitInt;
+
+// Callbacks are stored as a circular, doubly linked list.
+var firstCallbackNode = null;
+
+var currentDidTimeout = false;
+// Pausing the scheduler is useful for debugging.
+var isSchedulerPaused = false;
+
+var currentPriorityLevel = NormalPriority;
+var currentEventStartTime = -1;
+var currentExpirationTime = -1;
+
+// This is set when a callback is being executed, to prevent re-entrancy.
+var isExecutingCallback = false;
+
+var isHostCallbackScheduled = false;
+
+var hasNativePerformanceNow = typeof performance === 'object' && typeof performance.now === 'function';
+
+function ensureHostCallbackIsScheduled() {
+  if (isExecutingCallback) {
+    // Don't schedule work yet; wait until the next time we yield.
+    return;
+  }
+  // Schedule the host callback using the earliest expiration in the list.
+  var expirationTime = firstCallbackNode.expirationTime;
+  if (!isHostCallbackScheduled) {
+    isHostCallbackScheduled = true;
+  } else {
+    // Cancel the existing host callback.
+    cancelHostCallback();
+  }
+  requestHostCallback(flushWork, expirationTime);
+}
+
+function flushFirstCallback() {
+  var flushedNode = firstCallbackNode;
+
+  // Remove the node from the list before calling the callback. That way the
+  // list is in a consistent state even if the callback throws.
+  var next = firstCallbackNode.next;
+  if (firstCallbackNode === next) {
+    // This is the last callback in the list.
+    firstCallbackNode = null;
+    next = null;
+  } else {
+    var lastCallbackNode = firstCallbackNode.previous;
+    firstCallbackNode = lastCallbackNode.next = next;
+    next.previous = lastCallbackNode;
+  }
+
+  flushedNode.next = flushedNode.previous = null;
+
+  // Now it's safe to call the callback.
+  var callback = flushedNode.callback;
+  var expirationTime = flushedNode.expirationTime;
+  var priorityLevel = flushedNode.priorityLevel;
+  var previousPriorityLevel = currentPriorityLevel;
+  var previousExpirationTime = currentExpirationTime;
+  currentPriorityLevel = priorityLevel;
+  currentExpirationTime = expirationTime;
+  var continuationCallback;
+  try {
+    continuationCallback = callback();
+  } finally {
+    currentPriorityLevel = previousPriorityLevel;
+    currentExpirationTime = previousExpirationTime;
+  }
+
+  // A callback may return a continuation. The continuation should be scheduled
+  // with the same priority and expiration as the just-finished callback.
+  if (typeof continuationCallback === 'function') {
+    var continuationNode = {
+      callback: continuationCallback,
+      priorityLevel: priorityLevel,
+      expirationTime: expirationTime,
+      next: null,
+      previous: null
+    };
+
+    // Insert the new callback into the list, sorted by its expiration. This is
+    // almost the same as the code in `scheduleCallback`, except the callback
+    // is inserted into the list *before* callbacks of equal expiration instead
+    // of after.
+    if (firstCallbackNode === null) {
+      // This is the first callback in the list.
+      firstCallbackNode = continuationNode.next = continuationNode.previous = continuationNode;
+    } else {
+      var nextAfterContinuation = null;
+      var node = firstCallbackNode;
+      do {
+        if (node.expirationTime >= expirationTime) {
+          // This callback expires at or after the continuation. We will insert
+          // the continuation *before* this callback.
+          nextAfterContinuation = node;
+          break;
+        }
+        node = node.next;
+      } while (node !== firstCallbackNode);
+
+      if (nextAfterContinuation === null) {
+        // No equal or lower priority callback was found, which means the new
+        // callback is the lowest priority callback in the list.
+        nextAfterContinuation = firstCallbackNode;
+      } else if (nextAfterContinuation === firstCallbackNode) {
+        // The new callback is the highest priority callback in the list.
+        firstCallbackNode = continuationNode;
+        ensureHostCallbackIsScheduled();
+      }
+
+      var previous = nextAfterContinuation.previous;
+      previous.next = nextAfterContinuation.previous = continuationNode;
+      continuationNode.next = nextAfterContinuation;
+      continuationNode.previous = previous;
+    }
+  }
+}
+
+function flushImmediateWork() {
+  if (
+  // Confirm we've exited the outer most event handler
+  currentEventStartTime === -1 && firstCallbackNode !== null && firstCallbackNode.priorityLevel === ImmediatePriority) {
+    isExecutingCallback = true;
+    try {
+      do {
+        flushFirstCallback();
+      } while (
+      // Keep flushing until there are no more immediate callbacks
+      firstCallbackNode !== null && firstCallbackNode.priorityLevel === ImmediatePriority);
+    } finally {
+      isExecutingCallback = false;
+      if (firstCallbackNode !== null) {
+        // There's still work remaining. Request another callback.
+        ensureHostCallbackIsScheduled();
+      } else {
+        isHostCallbackScheduled = false;
+      }
+    }
+  }
+}
+
+function flushWork(didTimeout) {
+  // Exit right away if we're currently paused
+
+  if (enableSchedulerDebugging && isSchedulerPaused) {
+    return;
+  }
+
+  isExecutingCallback = true;
+  var previousDidTimeout = currentDidTimeout;
+  currentDidTimeout = didTimeout;
+  try {
+    if (didTimeout) {
+      // Flush all the expired callbacks without yielding.
+      while (firstCallbackNode !== null && !(enableSchedulerDebugging && isSchedulerPaused)) {
+        // TODO Wrap in feature flag
+        // Read the current time. Flush all the callbacks that expire at or
+        // earlier than that time. Then read the current time again and repeat.
+        // This optimizes for as few performance.now calls as possible.
+        var currentTime = exports.unstable_now();
+        if (firstCallbackNode.expirationTime <= currentTime) {
