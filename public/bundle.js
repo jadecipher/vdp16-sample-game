@@ -50154,3 +50154,185 @@ function unstable_scheduleCallback(callback, deprecated_options) {
 
 function unstable_pauseExecution() {
   isSchedulerPaused = true;
+}
+
+function unstable_continueExecution() {
+  isSchedulerPaused = false;
+  if (firstCallbackNode !== null) {
+    ensureHostCallbackIsScheduled();
+  }
+}
+
+function unstable_getFirstCallbackNode() {
+  return firstCallbackNode;
+}
+
+function unstable_cancelCallback(callbackNode) {
+  var next = callbackNode.next;
+  if (next === null) {
+    // Already cancelled.
+    return;
+  }
+
+  if (next === callbackNode) {
+    // This is the only scheduled callback. Clear the list.
+    firstCallbackNode = null;
+  } else {
+    // Remove the callback from its position in the list.
+    if (callbackNode === firstCallbackNode) {
+      firstCallbackNode = next;
+    }
+    var previous = callbackNode.previous;
+    previous.next = next;
+    next.previous = previous;
+  }
+
+  callbackNode.next = callbackNode.previous = null;
+}
+
+function unstable_getCurrentPriorityLevel() {
+  return currentPriorityLevel;
+}
+
+function unstable_shouldYield() {
+  return !currentDidTimeout && (firstCallbackNode !== null && firstCallbackNode.expirationTime < currentExpirationTime || shouldYieldToHost());
+}
+
+// The remaining code is essentially a polyfill for requestIdleCallback. It
+// works by scheduling a requestAnimationFrame, storing the time for the start
+// of the frame, then scheduling a postMessage which gets scheduled after paint.
+// Within the postMessage handler do as much work as possible until time + frame
+// rate. By separating the idle call into a separate event tick we ensure that
+// layout, paint and other browser work is counted against the available time.
+// The frame rate is dynamically adjusted.
+
+// We capture a local reference to any global, in case it gets polyfilled after
+// this module is initially evaluated. We want to be using a
+// consistent implementation.
+var localDate = Date;
+
+// This initialization code may run even on server environments if a component
+// just imports ReactDOM (e.g. for findDOMNode). Some environments might not
+// have setTimeout or clearTimeout. However, we always expect them to be defined
+// on the client. https://github.com/facebook/react/pull/13088
+var localSetTimeout = typeof setTimeout === 'function' ? setTimeout : undefined;
+var localClearTimeout = typeof clearTimeout === 'function' ? clearTimeout : undefined;
+
+// We don't expect either of these to necessarily be defined, but we will error
+// later if they are missing on the client.
+var localRequestAnimationFrame = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : undefined;
+var localCancelAnimationFrame = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : undefined;
+
+// requestAnimationFrame does not run when the tab is in the background. If
+// we're backgrounded we prefer for that work to happen so that the page
+// continues to load in the background. So we also schedule a 'setTimeout' as
+// a fallback.
+// TODO: Need a better heuristic for backgrounded work.
+var ANIMATION_FRAME_TIMEOUT = 100;
+var rAFID;
+var rAFTimeoutID;
+var requestAnimationFrameWithTimeout = function (callback) {
+  // schedule rAF and also a setTimeout
+  rAFID = localRequestAnimationFrame(function (timestamp) {
+    // cancel the setTimeout
+    localClearTimeout(rAFTimeoutID);
+    callback(timestamp);
+  });
+  rAFTimeoutID = localSetTimeout(function () {
+    // cancel the requestAnimationFrame
+    localCancelAnimationFrame(rAFID);
+    callback(exports.unstable_now());
+  }, ANIMATION_FRAME_TIMEOUT);
+};
+
+if (hasNativePerformanceNow) {
+  var Performance = performance;
+  exports.unstable_now = function () {
+    return Performance.now();
+  };
+} else {
+  exports.unstable_now = function () {
+    return localDate.now();
+  };
+}
+
+var requestHostCallback;
+var cancelHostCallback;
+var shouldYieldToHost;
+
+var globalValue = null;
+if (typeof window !== 'undefined') {
+  globalValue = window;
+} else if (typeof global !== 'undefined') {
+  globalValue = global;
+}
+
+if (globalValue && globalValue._schedMock) {
+  // Dynamic injection, only for testing purposes.
+  var globalImpl = globalValue._schedMock;
+  requestHostCallback = globalImpl[0];
+  cancelHostCallback = globalImpl[1];
+  shouldYieldToHost = globalImpl[2];
+  exports.unstable_now = globalImpl[3];
+} else if (
+// If Scheduler runs in a non-DOM environment, it falls back to a naive
+// implementation using setTimeout.
+typeof window === 'undefined' ||
+// Check if MessageChannel is supported, too.
+typeof MessageChannel !== 'function') {
+  // If this accidentally gets imported in a non-browser environment, e.g. JavaScriptCore,
+  // fallback to a naive implementation.
+  var _callback = null;
+  var _flushCallback = function (didTimeout) {
+    if (_callback !== null) {
+      try {
+        _callback(didTimeout);
+      } finally {
+        _callback = null;
+      }
+    }
+  };
+  requestHostCallback = function (cb, ms) {
+    if (_callback !== null) {
+      // Protect against re-entrancy.
+      setTimeout(requestHostCallback, 0, cb);
+    } else {
+      _callback = cb;
+      setTimeout(_flushCallback, 0, false);
+    }
+  };
+  cancelHostCallback = function () {
+    _callback = null;
+  };
+  shouldYieldToHost = function () {
+    return false;
+  };
+} else {
+  if (typeof console !== 'undefined') {
+    // TODO: Remove fb.me link
+    if (typeof localRequestAnimationFrame !== 'function') {
+      console.error("This browser doesn't support requestAnimationFrame. " + 'Make sure that you load a ' + 'polyfill in older browsers. https://fb.me/react-polyfills');
+    }
+    if (typeof localCancelAnimationFrame !== 'function') {
+      console.error("This browser doesn't support cancelAnimationFrame. " + 'Make sure that you load a ' + 'polyfill in older browsers. https://fb.me/react-polyfills');
+    }
+  }
+
+  var scheduledHostCallback = null;
+  var isMessageEventScheduled = false;
+  var timeoutTime = -1;
+
+  var isAnimationFrameScheduled = false;
+
+  var isFlushingHostCallback = false;
+
+  var frameDeadline = 0;
+  // We start out assuming that we run at 30fps but then the heuristic tracking
+  // will adjust this value to a faster fps if we get more frequent animation
+  // frames.
+  var previousFrameTime = 33;
+  var activeFrameTime = 33;
+
+  shouldYieldToHost = function () {
+    return frameDeadline <= exports.unstable_now();
+  };
