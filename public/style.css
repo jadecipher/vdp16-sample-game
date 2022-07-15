@@ -1,0 +1,39 @@
+
+html {
+  height: 100%;
+}
+
+body {
+  font-family: 'Verdana';
+  background-color: #cdedf6;
+  color: #042a2b;
+  height: 100%;
+}
+
+#app {
+  height: 100%;
+}
+
+#container {
+  display: flex;
+  justify-content: space-around;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.my-name {
+  display: flex;
+  flex-wrap: wrap;
+  width: 30%;
+}
+
+.my-name > h1 {
+  margin: 2%;
+}
+
+a {
+  text-decoration: none;
+  color: #042a2b;
+}
+
+h4 > a {
