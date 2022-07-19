@@ -1,1 +1,8 @@
-#!/usr/bin/
+#!/usr/bin/env bash
+
+# Hello, welcome to a bash script.
+
+# This bash script deploys your boilermaker application.
+
+# On the terminal you run individual
+# bash commands, and this file strings a bunch
