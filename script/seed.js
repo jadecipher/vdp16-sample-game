@@ -21,3 +21,12 @@ async function seed() {
       videoHeight: '100',
       imgSrc: 'imgSrc',
       imgAlt: 'imgAlt'
+    })
+  ]);
+
+  console.log(`seeded ${projects.length} users`);
+  console.log(`seeded successfully`);
+}
+
+// We've separated the `seed` function from the `runSeed` function.
+// This w
