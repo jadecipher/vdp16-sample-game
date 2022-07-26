@@ -29,4 +29,7 @@ async function seed() {
 }
 
 // We've separated the `seed` function from the `runSeed` function.
-// This w
+// This way we can isolate the error handling and exit trapping.
+// The `seed` function is concerned only with modifying the database.
+async function runSeed() {
+  cons
