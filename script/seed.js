@@ -13,4 +13,11 @@ async function seed() {
       addressUrl: 'addressUrl',
       displayUrl: 'displayUrl',
       description: 'desc',
-      githubUrl: 'gi
+      githubUrl: 'github',
+      technology: ['tech'],
+      teammates: ['mates'],
+      videoSrc: 'vidSrc',
+      videoWidth: '100',
+      videoHeight: '100',
+      imgSrc: 'imgSrc',
+      imgAlt: 'imgAlt'
