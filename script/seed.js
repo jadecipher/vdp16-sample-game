@@ -40,4 +40,10 @@ async function runSeed() {
     process.exitCode = 1;
   } finally {
     console.log('closing db connection');
-    awai
+    await db.close();
+    console.log('db connection closed');
+  }
+}
+
+// Execute the `seed` function, IF we ran this module directly (`node seed`).
+// `Async` functions always return a promise, so we can use `catc
