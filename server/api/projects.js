@@ -5,4 +5,8 @@ router.get('/', async (req, res, next) => {
   try {
     res.json(await Project.findAll());
   } catch (err) {
-    next(err
+    next(err);
+  }
+});
+
+module.exports = router;
