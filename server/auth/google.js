@@ -35,4 +35,14 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
       const email = profile.emails[0].value
 
       User.findOrCreate({
-       
+        where: {googleId},
+        defaults: {name, email}
+      })
+        .then(([user]) => done(null, user))
+        .catch(done)
+    }
+  )
+
+  passport.use(strategy)
+
+  router.get('/', passport.authenticate('goog
