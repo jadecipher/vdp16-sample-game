@@ -20,4 +20,14 @@ const Project = db.define('project', {
   },
   technology: {
     type: Sequelize.ARRAY(Sequelize.STRING),
-  
+    defaultValue: []
+  },
+  teammates: {
+    type: Sequelize.ARRAY(Sequelize.STRING),
+    defaultValue: []
+  },
+  videoSrc: {
+    type: Sequelize.STRING
+  },
+  videoWidth: {
+    type: Sequelize.
