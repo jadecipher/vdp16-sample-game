@@ -30,4 +30,17 @@ const Project = db.define('project', {
     type: Sequelize.STRING
   },
   videoWidth: {
-    type: Sequelize.
+    type: Sequelize.STRING
+  },
+  videoHeight: {
+    type: Sequelize.STRING
+  },
+  imgSrc: {
+    type: Sequelize.STRING
+  },
+  imgAlt: {
+    type: Sequelize.STRING
+  }
+});
+
+module.exports = 
