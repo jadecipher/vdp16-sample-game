@@ -43,4 +43,4 @@ const Project = db.define('project', {
   }
 });
 
-module.exports = 
+module.exports = Project;
