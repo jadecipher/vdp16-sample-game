@@ -21,4 +21,17 @@ const User = db.define('user', {
     // Making `.salt` act like a function hides it when serializing to JSON.
     // This is a hack to get around Sequelize's lack of a "private" option.
     get() {
-      return () => this
+      return () => this.getDataValue('salt')
+    }
+  },
+  googleId: {
+    type: Sequelize.STRING
+  }
+})
+
+module.exports = User
+
+/**
+ * instanceMethods
+ */
+User.prototype.correctPassword = function(candidat
