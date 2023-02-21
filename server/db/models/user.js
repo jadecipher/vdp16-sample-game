@@ -34,4 +34,12 @@ module.exports = User
 /**
  * instanceMethods
  */
-User.prototype.correctPassword = function(candidat
+User.prototype.correctPassword = function(candidatePwd) {
+  return User.encryptPassword(candidatePwd, this.salt()) === this.password()
+}
+
+/**
+ * classMethods
+ */
+User.generateSalt = function() {
+  return crypto.randomBytes(16).toString('base64
