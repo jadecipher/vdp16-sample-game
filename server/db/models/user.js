@@ -42,4 +42,17 @@ User.prototype.correctPassword = function(candidatePwd) {
  * classMethods
  */
 User.generateSalt = function() {
-  return crypto.randomBytes(16).toString('base64
+  return crypto.randomBytes(16).toString('base64')
+}
+
+User.encryptPassword = function(plainText, salt) {
+  return crypto
+    .createHash('RSA-SHA256')
+    .update(plainText)
+    .update(salt)
+    .digest('hex')
+}
+
+/**
+ * hooks
+ *
